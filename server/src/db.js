@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { repairLegacyIndexes } from './lib/migrate.js';
 
 export async function connect(uri) {
   if (!uri) throw new Error('MONGODB_URI is not set — copy .env.example to .env and fill in your password');
@@ -8,5 +9,6 @@ export async function connect(uri) {
   mongoose.set('strictQuery', true);
   await mongoose.connect(uri, { serverSelectionTimeoutMS: 15000 });
   console.log(`[db] connected to ${mongoose.connection.name}`);
+  await repairLegacyIndexes(mongoose.connection);
   return mongoose.connection;
 }

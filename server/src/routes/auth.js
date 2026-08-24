@@ -22,7 +22,15 @@ router.post('/signup', wrap(async (req, res) => {
   }
 
   const user = await User.create({ name, email, passwordHash: await User.hash(password) });
-  await Settings.load(user._id);          // give the new account its default categories
+
+  // Best-effort: settings are created on first read too, so a hiccup here must
+  // not leave someone with an account they never received a token for.
+  try {
+    await Settings.load(user._id);
+  } catch (err) {
+    console.warn(`[signup] could not pre-create settings for ${email}: ${err.message}`);
+  }
+
   res.status(201).json({ token: signToken(user._id), user: user.toSafeJSON() });
 }));
 
