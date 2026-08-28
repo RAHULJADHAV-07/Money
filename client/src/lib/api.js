@@ -95,6 +95,13 @@ export const auth = {
   signup: (body) => raw('/auth/signup', { method: 'POST', body, skipAuthRedirect: true }),
   login: (body) => raw('/auth/login', { method: 'POST', body, skipAuthRedirect: true }),
   me: () => raw('/auth/me', { skipAuthRedirect: true }),
+  // Whether the server has Google configured — handy for checking a deployment.
+  config: () => raw('/auth/config', { skipAuthRedirect: true }),
+  /* One call for both jobs. Signed out it signs in or creates the account;
+     signed in the token goes along and connects Google to that account. */
+  google: (credential) => raw('/auth/google', { method: 'POST', body: { credential }, skipAuthRedirect: true }),
+  disconnectGoogle: () => raw('/auth/google', { method: 'DELETE' }),
+  setPassword: (body) => raw('/auth/password', { method: 'PUT', body }),
 };
 
 export const api = {

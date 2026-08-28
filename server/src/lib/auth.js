@@ -15,6 +15,20 @@ export function jwtSecret() {
 export const signToken = (userId) =>
   jwt.sign({ sub: String(userId) }, jwtSecret(), { expiresIn: '30d' });
 
+/* Reads the signed-in user if there is one, without rejecting the request when
+   there isn't. Used by the Google route, which doubles as "sign me in" for a
+   visitor and "connect Google to this account" for someone already signed in. */
+export function optionalUserId(req) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return null;
+  try {
+    return jwt.verify(token, jwtSecret()).sub;
+  } catch {
+    return null;
+  }
+}
+
 // Guards every data route: no valid token, no data.
 export function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';

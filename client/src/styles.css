@@ -1450,3 +1450,57 @@ select.input {
     transition-duration: .01ms !important;
   }
 }
+
+/* ── Google sign-in ────────────────────────────────────────────────────────
+   Google renders its own button into .gbtn, so its inside cannot be styled.
+   What is ours is the slot around it: full width, centred, and a fixed height
+   so the form below does not jump while the script loads. */
+.gbtn {
+  display: flex; justify-content: center;
+  min-height: 44px;
+  margin-bottom: 16px;
+}
+.gbtn > div { display: flex; justify-content: center; width: 100%; }
+.gbtn--busy { opacity: .55; pointer-events: none; }
+
+/* "or use your email" — a rule with the label sitting in a gap in it. */
+.or-split {
+  display: flex; align-items: center; gap: 12px;
+  margin: 4px 0 18px;
+  font-size: 11.5px; color: var(--ink-3);
+}
+.or-split::before,
+.or-split::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+/* ── Ways to sign in ───────────────────────────────────────────────────── */
+.method-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.method-row:last-of-type { border-bottom: 0; }
+/* The connect button sits under its row, so the row above it loses its rule. */
+.method-row:has(+ .gbtn) { border-bottom: 0; }
+.card .gbtn { margin: 4px 0 0; }
+
+.method-badge {
+  display: grid; place-items: center; flex: none;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--surface-3); color: var(--ink-3);
+}
+.method-badge.on { background: color-mix(in srgb, var(--in) var(--tint), transparent); color: var(--in); }
+.method-badge svg { width: 15px; height: 15px; }
+
+.method-who { flex: 1; min-width: 0; }
+.method-who .nm { display: block; font-size: 14px; font-weight: 640; }
+.method-who .em {
+  display: block; font-size: 12px; color: var(--ink-3); margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.method-form {
+  padding: 14px; margin: 4px 0 12px;
+  border-radius: var(--r-md); background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.method-form .field:last-of-type { margin-bottom: 14px; }

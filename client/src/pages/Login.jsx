@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../lib/auth.jsx';
 import { IconCheck } from '../components/Icons.jsx';
+import GoogleButton from '../components/GoogleButton.jsx';
+import { googleEnabled } from '../lib/google.js';
 
 const PERKS = [
   'Every expense, income and transfer in one ledger',
@@ -9,7 +11,7 @@ const PERKS = [
 ];
 
 export default function Login() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, continueWithGoogle } = useAuth();
   const [mode, setMode] = useState('login');       // 'login' | 'signup'
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -36,6 +38,19 @@ export default function Login() {
   }
 
   const switchTo = (m) => { setMode(m); setError(''); };
+
+  /* Google covers signing up and signing in with one button, so it does not
+     change with the tab above it — only the wording does. */
+  async function fromGoogle(credential) {
+    setBusy(true);
+    setError('');
+    try {
+      await continueWithGoogle(credential);
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="auth">
@@ -68,8 +83,21 @@ export default function Login() {
                     onClick={() => switchTo('signup')}>Create account</button>
           </div>
 
+          {error && <div className="error-msg" role="alert">{error}</div>}
+
+          {googleEnabled() && (
+            <>
+              <GoogleButton
+                text={isSignup ? 'signup_with' : 'continue_with'}
+                busy={busy}
+                onCredential={fromGoogle}
+                onError={setError}
+              />
+              <div className="or-split"><span>or use your email</span></div>
+            </>
+          )}
+
           <form onSubmit={submit}>
-            {error && <div className="error-msg" role="alert">{error}</div>}
 
             {isSignup && (
               <div className="field">

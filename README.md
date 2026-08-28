@@ -3,7 +3,7 @@
 A mobile-first PWA for daily money tracking: **daily transactions, borrowed & lent,
 money received, savings, and balance** — the five things you asked for, on one screen.
 
-React (Vite) · Node/Express · Neon Postgres · accounts · installable · works offline.
+React (Vite) · Node/Express · Neon Postgres · Google or password sign-in · installable · works offline.
 
 **Deploying to Render + Vercel? See [DEPLOY.md](DEPLOY.md).**
 
@@ -100,6 +100,12 @@ other's data.
 Sign-in uses a token stored in the browser (valid 30 days), sent as an
 `Authorization` header. Passwords are hashed with bcrypt and never leave the server.
 
+There are two ways in and they reach the **same account**: an email and password,
+or Continue with Google. Signing in with Google for the first time on an email
+that already has an account links the two rather than making a second one — so
+your ledger does not split in half. Either method can be added later under
+**Settings → Ways to sign in**, and the last one standing cannot be removed.
+
 ## What is where
 
 ```
@@ -180,3 +186,72 @@ Two details worth knowing:
 
 Once you have checked the numbers in the app, `MONGODB_URI` can be deleted from
 `server/.env` and the Atlas cluster shut down. The app itself never reads it.
+
+## Setting up Google sign-in
+
+Optional — leave the two variables empty and the button simply does not appear.
+
+**1. Make an OAuth client**
+
+1. [console.cloud.google.com](https://console.cloud.google.com) → create or pick a project
+2. **APIs & Services → OAuth consent screen** → *External* → fill in the app name,
+   your support email and developer email → Save. While it stays in *Testing*,
+   add every Google address that should be able to sign in under **Test users**.
+   Publishing it removes that limit; a basic app needs no verification review.
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID**
+4. Application type **Web application**
+5. **Authorised JavaScript origins** — the page the button is on, one entry per
+   environment, scheme included and no trailing slash:
+
+   ```
+   http://localhost:5173      (vite dev)
+   http://localhost:4000      (npm start, one-box mode)
+   https://your-app.vercel.app
+   ```
+
+6. Leave **Authorised redirect URIs** empty — this flow never redirects.
+7. Create, and copy the **Client ID** (ends in `.apps.googleusercontent.com`).
+
+**2. Put it in both places**
+
+The same value goes in both, or the browser will produce tokens the server
+refuses:
+
+```
+client/.env    VITE_GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
+server/.env    GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
+```
+
+In production that means the `VITE_GOOGLE_CLIENT_ID` build variable on Vercel
+(rebuild after adding it — Vite bakes it into the bundle) and `GOOGLE_CLIENT_ID`
+on Render. The Client ID is **not** a secret: it ships inside the frontend either
+way. There is no client secret in this flow.
+
+**3. Check it took**
+
+```bash
+curl https://your-api.onrender.com/api/auth/config     # -> {"google":true}
+```
+
+`{"google":false}` means the server never got `GOOGLE_CLIENT_ID`. If the button
+is missing from the sign-in screen instead, the *frontend* never got
+`VITE_GOOGLE_CLIENT_ID` at build time.
+
+### How it is kept honest
+
+The browser never tells the server who you are. It hands over the ID token
+Google signed, and [server/src/lib/google.js](server/src/lib/google.js) checks
+that signature against Google's published keys, checks the token was minted for
+this exact client id, and refuses any address Google has not verified. A token
+forged with the right issuer, audience and email is rejected before any account
+is looked up.
+
+**Common errors**
+
+| What you see | Cause |
+|---|---|
+| `origin is not allowed for the given client ID` | The exact origin is missing from Authorised JavaScript origins. `localhost` and `127.0.0.1` count as different |
+| The button never appears | `VITE_GOOGLE_CLIENT_ID` was unset when the frontend was built. Set it and **rebuild** |
+| "Google sign-in is not configured on this server" | `GOOGLE_CLIENT_ID` missing on the API |
+| "That Google sign-in could not be verified" | The two ids do not match each other |
+| `403 access_denied` | Consent screen is in *Testing* and that address is not in Test users |

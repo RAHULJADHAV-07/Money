@@ -59,6 +59,7 @@ the first time the API boots, so there is no schema to load by hand.
 | Key | Value |
 |---|---|
 | `DATABASE_URL` | your pooled Neon string, real password, `?sslmode=verify-full` on the end |
+| `GOOGLE_CLIENT_ID` | optional — same value as the frontend's `VITE_GOOGLE_CLIENT_ID` (see README) |
 | `JWT_SECRET` | a long random string (below) |
 | `NODE_ENV` | `production` |
 
@@ -92,11 +93,12 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 | Build Command | `npm run build` *(default)* |
 | Output Directory | `dist` *(default)* |
 
-3. **Environment Variables** — add one:
+3. **Environment Variables** — add these:
 
 | Key | Value |
 |---|---|
 | `VITE_API_URL` | `https://hisab-api.onrender.com` *(no trailing slash)* |
+| `VITE_GOOGLE_CLIENT_ID` | optional — your Google OAuth Client ID, for the Continue with Google button |
 
 4. **Deploy**. You'll get `https://my-hisab.vercel.app`.
 

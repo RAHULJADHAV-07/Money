@@ -8,6 +8,7 @@ import {
   IconSun, IconMoon, IconAuto, IconDownload, IconLogout, IconClose, IconPlus,
   IconWallet, IconTag, IconTarget, IconUser, IconInfo,
 } from '../components/Icons.jsx';
+import SignInMethods from '../components/SignInMethods.jsx';
 
 const THEME_ICON = { system: <IconAuto />, light: <IconSun />, dark: <IconMoon /> };
 
@@ -222,6 +223,8 @@ export default function Settings() {
           </button>
         </div>
       </div>
+
+      <SignInMethods notify={notify} />
 
       <div className="card">
         <div className="card-head"><h2 className="card-title">Your data</h2></div>

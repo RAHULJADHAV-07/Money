@@ -60,6 +60,21 @@ create table if not exists transactions (
   updated_at timestamptz not null default now()
 );
 
+/* ── Google sign-in ────────────────────────────────────────────────────────
+   An account can hold a password, a linked Google identity, or both, and the
+   two reach the same data. These run as ALTERs rather than being folded into
+   the CREATE above so that a database made by an earlier version picks them
+   up on its next boot. All three are idempotent.                            */
+alter table users add column if not exists google_id  text;
+alter table users add column if not exists avatar_url text;
+
+-- Postgres allows many NULLs under a unique index, so password-only accounts
+-- are unaffected while a Google id can still belong to exactly one account.
+create unique index if not exists users_google_id_key on users (google_id);
+
+-- An account created through Google has no password to store.
+alter table users alter column password_hash drop not null;
+
 create index if not exists goals_user_idx        on goals (user_id);
 create index if not exists tx_user_date_idx      on transactions (user_id, date desc, created_at desc);
 create index if not exists tx_user_kind_idx      on transactions (user_id, kind);
