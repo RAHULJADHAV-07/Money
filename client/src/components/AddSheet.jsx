@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Sheet from './Sheet.jsx';
 import { api } from '../lib/api.js';
 import { useStore } from '../lib/store.jsx';
-import { KINDS, ADD_ORDER, isSettle } from '../lib/kinds.js';
-import { todayKey } from '../lib/format.js';
+import { KINDS, ADD_ORDER, isSettle, dirOf } from '../lib/kinds.js';
+import { todayKey, money } from '../lib/format.js';
 import { IconTrash } from './Icons.jsx';
+import Alert from './Alert.jsx';
 
 const TONE_OF = (kind) => KINDS[kind]?.tone || 'out';
 
@@ -24,6 +25,8 @@ export default function AddSheet() {
   const [note, setNote] = useState('');
   const [goals, setGoals] = useState([]);
   const [people, setPeople] = useState([]);
+  const [wallets, setWallets] = useState(null);
+  const [alert, setAlert] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const chipsRef = useRef(null);
@@ -32,6 +35,17 @@ export default function AddSheet() {
     api.goals().then((g) => setGoals(g.items)).catch(() => {});
     api.people().then((p) => setPeople(p.people.map((x) => x.person))).catch(() => {});
   }, []);
+
+  /* Wallet balances, with the entry being edited left out — otherwise raising a
+     100 to 150 would be measured against a balance that still had the 100
+     deducted, and a perfectly ordinary edit would look unaffordable. */
+  useEffect(() => {
+    let alive = true;
+    api.wallets(editing?._id)
+      .then((r) => alive && setWallets(r.wallets))
+      .catch(() => alive && setWallets(null));
+    return () => { alive = false; };
+  }, [editing?._id]);
 
   // Seed the form from the entry being edited, or from where the sheet was opened.
   useEffect(() => {
@@ -100,7 +114,28 @@ export default function AddSheet() {
     return true;
   }, [amount, needs, person, effToMethod]);
 
+  /* What the wallet paying for this entry holds, and whether the entry would
+     take more than that. Income and settlements take nothing out, so they can
+     never be short; a transfer does leave its wallet even though its direction
+     is neutral overall. While the balances are still loading `available` is
+     null, and nothing is blocked on a guess. */
+  const available = wallets ? (wallets.find((w) => w.name === effMethod)?.balance ?? 0) : null;
+  const spend = (needs === 'transfer' || dirOf(kind) < 0) ? Number(amount) || 0 : 0;
+  const takesFromWallet = spend > 0 && available !== null;
+  const short = takesFromWallet && spend > available + 0.005;
+
+  // An empty wallet usually means the opening balance was never set, rather
+  // than that there is genuinely nothing there — so the way out is named.
+  const shortMessage = () =>
+    `${available <= 0.005 ? `${effMethod} is empty.` : `${effMethod} only has ${money(available, currency)}.`} ` +
+    `This entry needs ${money(spend, currency)}. Pick another wallet, or if ${effMethod} already held money ` +
+    `before you started logging here, set its opening balance in Settings → Wallets.`;
+
   async function save() {
+    if (short) {
+      setAlert({ title: `Not enough in ${effMethod}`, message: shortMessage() });
+      return;
+    }
     setSaving(true);
     setError('');
     const body = {
@@ -118,7 +153,10 @@ export default function AddSheet() {
       refresh();
       closeAdd();
     } catch (err) {
-      setError(err.message);
+      // The server checks the same rule; if it refuses (stale balances, or a
+      // queued entry replayed later) say so the same way rather than inline.
+      if (err.code === 'INSUFFICIENT_FUNDS') setAlert({ title: 'Not enough in that wallet', message: err.message });
+      else setError(err.message);
       setSaving(false);
     }
   }
@@ -159,6 +197,13 @@ export default function AddSheet() {
             className={`amount-input tone-text-${tone === 'flat' ? 'ink' : tone}`}
           />
         </div>
+        {short && (
+          <p className="field-warn" role="status">
+            {available <= 0.005
+              ? `${effMethod} is empty — this needs ${money(spend, currency)}.`
+              : `${effMethod} has ${money(available, currency)} — ${money(spend - available, currency)} short.`}
+          </p>
+        )}
       </div>
 
       {needs === 'category' && (
@@ -205,7 +250,9 @@ export default function AddSheet() {
       {needs === 'transfer' && (
         <div className="row-2">
           <div className="field">
-            <label className="field-label" htmlFor="from-mth">From</label>
+            <label className="field-label" htmlFor="from-mth">
+              From{available !== null && <span className="field-note">{money(available, currency)} in {effMethod}</span>}
+            </label>
             <select id="from-mth" className="input" value={effMethod} onChange={(e) => setMethod(e.target.value)}>
               {methodOptions.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
@@ -234,7 +281,12 @@ export default function AddSheet() {
         </div>
         {needsWallet && (
           <div className="field">
-            <label className="field-label" htmlFor="pay-mth">{KINDS[kind].dir > 0 ? 'Received in' : 'Paid from'}</label>
+            <label className="field-label" htmlFor="pay-mth">
+              {KINDS[kind].dir > 0 ? 'Received in' : 'Paid from'}
+              {available !== null && dirOf(kind) < 0 && (
+                <span className="field-note">{money(available, currency)} available</span>
+              )}
+            </label>
             <select id="pay-mth" className="input" value={effMethod} onChange={(e) => setMethod(e.target.value)}>
               {methodOptions.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
@@ -259,6 +311,10 @@ export default function AddSheet() {
           {saving ? 'Saving…' : editing ? 'Save changes' : KINDS[kind].cta}
         </button>
       </div>
+
+      {alert && (
+        <Alert title={alert.title} message={alert.message} onClose={() => setAlert(null)} />
+      )}
     </Sheet>
   );
 }

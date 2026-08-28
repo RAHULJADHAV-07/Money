@@ -12,7 +12,7 @@ let onUnauthorized = () => {};
 export const setUnauthorizedHandler = (fn) => { onUnauthorized = fn; };
 
 export class ApiError extends Error {
-  constructor(message, status) { super(message); this.status = status; }
+  constructor(message, status, code) { super(message); this.status = status; this.code = code; }
 }
 
 const readOutbox = () => { try { return JSON.parse(localStorage.getItem(OUTBOX) || '[]'); } catch { return []; } };
@@ -41,7 +41,7 @@ async function raw(path, { method = 'GET', body, signal, skipAuthRedirect } = {}
   const data = text ? JSON.parse(text) : null;
 
   if (res.status === 401 && !skipAuthRedirect) onUnauthorized();
-  if (!res.ok) throw new ApiError(data?.error || `Request failed (${res.status})`, res.status);
+  if (!res.ok) throw new ApiError(data?.error || `Request failed (${res.status})`, res.status, data?.code);
   return data;
 }
 
@@ -106,6 +106,10 @@ export const auth = {
 
 export const api = {
   summary: (month, today) => get(`/summary?month=${month}&today=${today}`),
+  /* Just the wallet balances, for checking an entry against the wallet paying
+     for it. `exclude` leaves out the entry being edited, so its own old amount
+     is not counted against its new one. */
+  wallets: (exclude) => get(`/summary/wallets${exclude ? `?exclude=${encodeURIComponent(exclude)}` : ''}`),
   calendar: (month) => get(`/summary/calendar?month=${month}`),
   yearSummary: (year) => get(`/summary/year?year=${year}`),
   transactions: (params) => get(`/transactions?${new URLSearchParams(params)}`),

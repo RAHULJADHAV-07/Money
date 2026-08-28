@@ -172,6 +172,28 @@ export const transferIn = (userId) =>
     [userId]
   );
 
+/* Per-wallet movement, for the balance check on save. `excludeId` leaves the
+   entry being edited out, so raising a 100 to 150 is measured against the
+   wallet without that 100 in it rather than against itself. */
+export const walletMovement = (userId, excludeId = null) =>
+  many(
+    `select method as wallet, kind, sum(amount) as total
+       from transactions
+      where user_id = $1 and ($2::text is null or id <> $2)
+      group by method, kind`,
+    [userId, excludeId]
+  );
+
+export const walletTransferIn = (userId, excludeId = null) =>
+  many(
+    `select to_method as wallet, sum(amount) as total
+       from transactions
+      where user_id = $1 and kind = 'transfer' and to_method <> ''
+        and ($2::text is null or id <> $2)
+      group by to_method`,
+    [userId, excludeId]
+  );
+
 export const byDay = (userId, from, to) =>
   many(
     `select date::text as day, kind, sum(amount) as total, count(*)::int as count

@@ -35,8 +35,17 @@ export function StoreProvider({ children }) {
     const sync = async () => {
       setOnline(navigator.onLine);
       if (!navigator.onLine) return;
-      const { sent } = await flushOutbox();
-      if (sent) { notify(`Synced ${sent} saved ${sent === 1 ? 'entry' : 'entries'}`); refresh(); }
+      const { sent, failed } = await flushOutbox();
+      /* A queued entry the server refuses — one that would overdraw a wallet,
+         say — is dropped from the queue rather than retried forever. Saying so
+         is the difference between "I told you" and an entry quietly vanishing. */
+      if (sent || failed) {
+        const said = [];
+        if (sent) said.push(`Synced ${sent} saved ${sent === 1 ? 'entry' : 'entries'}`);
+        if (failed) said.push(`${failed} was rejected — please add ${failed === 1 ? 'it' : 'them'} again`);
+        notify(said.join(' · '));
+        if (sent) refresh();
+      }
     };
     // Named handler: an inline arrow here would be a different function each call,
     // so removeEventListener would never actually detach it.

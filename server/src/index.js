@@ -63,7 +63,8 @@ app.get(/^(?!\/api\/).*/, (req, res, next) => {
 app.use((err, req, res, next) => {
   const status = err.status || (/CORS/.test(err.message) ? 403 : 500);
   if (status >= 500) console.error(err);
-  res.status(status).json({ error: err.message || 'Something went wrong' });
+  // `code` lets the app tell one refusal from another without matching on prose.
+  res.status(status).json({ error: err.message || 'Something went wrong', ...(err.code && { code: err.code }) });
 });
 
 const PORT = process.env.PORT || 4000;

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as Transaction from '../models/Transaction.js';
 import * as Settings from '../models/Settings.js';
 import { KINDS, dirOf, debtNet } from '../lib/kinds.js';
+import { openingsFor, balancesFrom } from '../lib/wallets.js';
 import { monthRange, lastMonths, toDayKey, dayKey, startOfToday } from '../lib/dates.js';
 import { wrap } from '../lib/async.js';
 
@@ -46,12 +47,7 @@ router.get('/', wrap(async (req, res) => {
   /* ── Wallets ───────────────────────────────────────────────────────────────
      Each wallet's balance is its opening figure, plus every entry that touched
      it, plus transfers that landed in it and minus transfers that left it.  */
-  const openings = { ...(settings.openingBalances || {}) };
-  // Before wallets existed there was a single opening figure; treat it as the
-  // first wallet's, so the wallet balances always add up to the headline one.
-  if (!Object.keys(openings).length && settings.openingBalance) {
-    openings[(settings.methods || [])[0] || 'Cash'] = settings.openingBalance;
-  }
+  const openings = openingsFor(settings);
   const openingTotal = Object.values(openings).reduce((n, v) => n + (Number(v) || 0), 0);
   const methods = [...new Set([
     ...(settings.methods || []),
@@ -166,6 +162,30 @@ router.get('/', wrap(async (req, res) => {
     walletTotal,
     trend,
     recent: recentRows.map(Transaction.toJSON),
+  });
+}));
+
+/* Just the wallet balances. The add form asks for these to check an entry
+   against the wallet paying for it, and loading the whole dashboard to get four
+   numbers would make opening the form noticeably slower.
+
+   `exclude` drops one entry from the sums — the one being edited, so its own
+   old amount is not counted against its new one. */
+router.get('/wallets', wrap(async (req, res) => {
+  const exclude = req.query.exclude || null;
+  const [settingsRow, movement, transferIn] = await Promise.all([
+    Settings.load(req.userId),
+    Transaction.walletMovement(req.userId, exclude),
+    Transaction.walletTransferIn(req.userId, exclude),
+  ]);
+
+  const settings = Settings.toJSON(settingsRow);
+  const balances = balancesFrom({ openings: openingsFor(settings), movement, transferIn });
+  const names = [...new Set([...(settings.methods || []), ...Object.keys(balances)])];
+
+  res.json({
+    currency: settings.currency,
+    wallets: names.map((name) => ({ name, balance: balances[name] || 0 })),
   });
 }));
 

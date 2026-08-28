@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import * as Transaction from '../models/Transaction.js';
 import * as Goal from '../models/Goal.js';
+import * as Settings from '../models/Settings.js';
 import { KINDS, KIND_LIST } from '../lib/kinds.js';
+import { openingsFor, balancesFrom, walletSpend } from '../lib/wallets.js';
 import { toDayKey, dayKey, monthRange } from '../lib/dates.js';
 import { wrap } from '../lib/async.js';
 
@@ -73,15 +75,65 @@ async function assertOwnGoal(goalId, userId) {
   }
 }
 
+/*
+ * You cannot spend from a wallet what it does not hold.
+ *
+ * The wallet balance is the one shown on the dashboard, so a refusal here always
+ * matches what the app is displaying. Editing an entry measures against the
+ * wallet with that entry taken back out, or raising an amount would be compared
+ * against a balance that still included the old one.
+ *
+ * The message names the way out: an empty wallet usually means the opening
+ * balance was never set, not that there is genuinely no money.
+ */
+const NEAR_ZERO = 0.005;   // amounts are stored to the paisa; ignore float dust
+
+async function assertWalletCovers(userId, doc, excludeId = null) {
+  const spend = walletSpend(doc);
+  if (spend <= 0) return;
+
+  const [settings, movement, transferIn] = await Promise.all([
+    Settings.load(userId),
+    Transaction.walletMovement(userId, excludeId),
+    Transaction.walletTransferIn(userId, excludeId),
+  ]);
+
+  const wallet = doc.method || 'Cash';
+  const balances = balancesFrom({
+    openings: openingsFor(Settings.toJSON(settings)),
+    movement,
+    transferIn,
+  });
+  const available = balances[wallet] || 0;
+  if (spend <= available + NEAR_ZERO) return;
+
+  const cur = settings.currency || '';
+  const money = (n) => `${cur}${Math.round(n * 100) / 100}`;
+  const detail = available <= NEAR_ZERO
+    ? `${wallet} is empty.`
+    : `${wallet} only has ${money(available)}.`;
+
+  throw Object.assign(
+    new Error(
+      `${detail} This entry needs ${money(spend)}. ` +
+      `Pick another wallet, or if ${wallet} already held money before you started logging here, ` +
+      `set its opening balance in Settings → Wallets.`
+    ),
+    { status: 400, code: 'INSUFFICIENT_FUNDS', wallet, available, needed: spend }
+  );
+}
+
 router.post('/', wrap(async (req, res) => {
   const doc = clean(req.body);
   await assertOwnGoal(doc.goal, req.userId);
+  await assertWalletCovers(req.userId, doc);
   res.status(201).json(Transaction.toJSON(await Transaction.create(req.userId, doc)));
 }));
 
 router.put('/:id', wrap(async (req, res) => {
   const doc = clean(req.body);
   await assertOwnGoal(doc.goal, req.userId);
+  await assertWalletCovers(req.userId, doc, req.params.id);
   const updated = await Transaction.update(req.params.id, req.userId, doc);
   if (!updated) return res.status(404).json({ error: 'Transaction not found' });
   res.json(Transaction.toJSON(updated));

@@ -12,6 +12,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
+  --kb: 0px;             /* on-screen keyboard overlap, set from JS */
   color-scheme: light;
 
   /* ── Surfaces ─────────────────────────────────────────────────────────── */
@@ -847,10 +848,12 @@ button.cat:hover { background: var(--surface-2); }
   animation: fade .22s var(--ease);
 }
 .sheet {
-  position: fixed; z-index: 61; left: 0; right: 0; bottom: 0;
+  /* --kb is the on-screen keyboard's overlap (see lib/keyboard.js). It is 0
+     wherever the viewport already resizes itself, so this never double-counts. */
+  position: fixed; z-index: 61; left: 0; right: 0; bottom: var(--kb, 0px);
   max-width: var(--shell); margin: 0 auto;
   display: flex; flex-direction: column;
-  max-height: 92dvh;
+  max-height: calc(92dvh - var(--kb, 0px));
   background: var(--canvas);
   border-radius: var(--r-xl) var(--r-xl) 0 0;
   box-shadow: var(--e3);
@@ -894,9 +897,13 @@ button.cat:hover { background: var(--surface-2); }
 /* ═══ Forms ════════════════════════════════════════════════════════════════ */
 .field { margin-bottom: 16px; }
 .field-label {
-  display: block; font-size: 12px; font-weight: 640; color: var(--ink-2);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  font-size: 12px; font-weight: 640; color: var(--ink-2);
   margin-bottom: 8px; letter-spacing: -.005em;
 }
+/* What the paying wallet holds, shown beside its label — so the limit is
+   visible before the amount is typed, not only after it is rejected. */
+.field-note { font-weight: 560; color: var(--ink-3); white-space: nowrap; }
 .input {
   width: 100%; padding: 12px 14px; min-height: 46px;
   border-radius: var(--r-sm);
@@ -1504,3 +1511,46 @@ select.input {
   border: 1px solid var(--line);
 }
 .method-form .field:last-of-type { margin-bottom: 14px; }
+
+/* ── Not enough in the wallet ──────────────────────────────────────────────
+   The live line under the amount, shown while typing. */
+.field-warn {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 8px; font-size: 12px; font-weight: 580; line-height: 1.5;
+  color: var(--danger);
+}
+
+/* A blocking popup for something the app will not do. It sits above the add
+   sheet (z-index 61), so the form stays put underneath while it explains. */
+.alert-scrim {
+  position: fixed; inset: 0; z-index: 70;
+  background: rgba(6, 10, 8, .55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: fade .18s var(--ease);
+}
+.alert {
+  position: fixed; z-index: 71;
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(360px, calc(100vw - 40px));
+  padding: 22px 20px 18px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--e3);
+  text-align: center;
+  animation: dialog-in .22s var(--ease);
+}
+.alert-ico {
+  display: grid; place-items: center;
+  width: 44px; height: 44px; margin: 0 auto 14px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--danger) var(--tint), transparent);
+  color: var(--danger);
+}
+.alert-ico svg { width: 21px; height: 21px; }
+.alert-title { font-size: 17px; font-weight: 690; letter-spacing: -.025em; }
+.alert-msg {
+  margin: 8px 0 18px;
+  font-size: 13px; line-height: 1.6; color: var(--ink-2);
+}
