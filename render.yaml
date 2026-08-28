@@ -13,8 +13,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: MONGODB_URI
-        sync: false                # set in the dashboard — never commit this
+      - key: DATABASE_URL
+        sync: false                # Neon pooled connection string — never commit this
       - key: JWT_SECRET
         generateValue: true        # Render generates a strong random secret
       - key: CORS_ORIGINS

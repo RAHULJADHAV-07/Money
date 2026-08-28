@@ -1,24 +1,21 @@
-import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { one } from '../db.js';
 
-const userSchema = new mongoose.Schema(
-  {
-    name:         { type: String, required: true, trim: true },
-    email:        { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
-    passwordHash: { type: String, required: true },
-  },
-  { timestamps: true }
-);
+export const hash = (plain) => bcrypt.hash(plain, 10);
 
-userSchema.statics.hash = (plain) => bcrypt.hash(plain, 10);
-
-userSchema.methods.checkPassword = function (plain) {
-  return bcrypt.compare(plain, this.passwordHash);
-};
+export const checkPassword = (user, plain) => bcrypt.compare(plain, user.password_hash);
 
 // Never let the hash escape in an API response.
-userSchema.methods.toSafeJSON = function () {
-  return { id: this._id, name: this.name, email: this.email, createdAt: this.createdAt };
-};
+export const toSafeJSON = (u) => ({ id: u.id, name: u.name, email: u.email, createdAt: u.created_at });
 
-export default mongoose.model('User', userSchema);
+export const findByEmail = (email) => one('select * from users where email = $1', [email]);
+
+export const findById = (id) => one('select * from users where id = $1', [id]);
+
+export const emailTaken = async (email) => !!(await one('select 1 from users where email = $1', [email]));
+
+export const create = ({ name, email, passwordHash }) =>
+  one(
+    'insert into users (name, email, password_hash) values ($1, $2, $3) returning *',
+    [name, email, passwordHash]
+  );

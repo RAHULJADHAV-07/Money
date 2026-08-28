@@ -1,31 +1,26 @@
 import { Router } from 'express';
-import mongoose from 'mongoose';
-import Goal from '../models/Goal.js';
-import Transaction from '../models/Transaction.js';
+import * as Goal from '../models/Goal.js';
 import { wrap } from '../lib/async.js';
 
 const router = Router();
 
 router.get('/', wrap(async (req, res) => {
   const [goals, sums] = await Promise.all([
-    Goal.find({ user: req.userId, archived: false }).sort({ createdAt: 1 }).lean(),
-    Transaction.aggregate([
-      { $match: { user: new mongoose.Types.ObjectId(req.userId), kind: { $in: ['saving_in', 'saving_out'] } } },
-      { $group: { _id: { goal: '$goal', kind: '$kind' }, total: { $sum: '$amount' } } },
-    ]),
+    Goal.listActive(req.userId),
+    Goal.savedTotals(req.userId),
   ]);
 
   const saved = {};
   let unassigned = 0;
   for (const s of sums) {
-    const sign = s._id.kind === 'saving_in' ? 1 : -1;
-    if (!s._id.goal) { unassigned += sign * s.total; continue; }
-    saved[String(s._id.goal)] = (saved[String(s._id.goal)] || 0) + sign * s.total;
+    const sign = s.kind === 'saving_in' ? 1 : -1;
+    if (!s.goal_id) { unassigned += sign * s.total; continue; }
+    saved[s.goal_id] = (saved[s.goal_id] || 0) + sign * s.total;
   }
 
   const items = goals.map((g) => {
-    const amount = saved[String(g._id)] || 0;
-    return { ...g, saved: amount, progress: g.target > 0 ? Math.min(1, amount / g.target) : 0 };
+    const amount = saved[g.id] || 0;
+    return { ...Goal.toJSON(g), saved: amount, progress: g.target > 0 ? Math.min(1, amount / g.target) : 0 };
   });
 
   res.json({
@@ -38,30 +33,29 @@ router.get('/', wrap(async (req, res) => {
 
 router.post('/', wrap(async (req, res) => {
   const goal = await Goal.create({
-    user: req.userId,
+    userId: req.userId,
     name: String(req.body.name || '').trim(),
     target: Number(req.body.target) || 0,
     color: req.body.color || '#2f9e6f',
   });
-  res.status(201).json(goal);
+  res.status(201).json(Goal.toJSON(goal));
 }));
 
 router.put('/:id', wrap(async (req, res) => {
-  const goal = await Goal.findOneAndUpdate({ _id: req.params.id, user: req.userId }, {
+  const goal = await Goal.update(req.params.id, req.userId, {
     ...(req.body.name !== undefined && { name: String(req.body.name).trim() }),
     ...(req.body.target !== undefined && { target: Number(req.body.target) || 0 }),
     ...(req.body.color !== undefined && { color: req.body.color }),
     ...(req.body.archived !== undefined && { archived: !!req.body.archived }),
-  }, { new: true });
+  });
   if (!goal) return res.status(404).json({ error: 'Goal not found' });
-  res.json(goal);
+  res.json(Goal.toJSON(goal));
 }));
 
 // Deleting a goal keeps its transactions — they fall back to unassigned savings.
 router.delete('/:id', wrap(async (req, res) => {
-  const gone = await Goal.findOneAndDelete({ _id: req.params.id, user: req.userId });
+  const gone = await Goal.remove(req.params.id, req.userId);
   if (!gone) return res.status(404).json({ error: 'Goal not found' });
-  await Transaction.updateMany({ goal: req.params.id, user: req.userId }, { $set: { goal: null } });
   res.json({ ok: true, id: req.params.id });
 }));
 

@@ -1,100 +1,183 @@
 import { useState } from 'react';
 import { money, compact, monthShort } from '../lib/format.js';
 import { useStore } from '../lib/store.jsx';
+import { hueFor, initialsOf } from '../lib/palette.js';
 
-/* Spend by category: one measure across categories, so a single hue carries
-   magnitude and the row label carries identity — no legend needed. */
-export function CategoryBars({ rows, max }) {
+/* A bar with only its top corners rounded, so every bar sits flat on the
+   baseline however short it is. */
+function topRounded(x, y, w, h, r) {
+  const rr = Math.max(0, Math.min(r, w / 2, h));
+  return `M${x},${y + h} L${x},${y + rr} Q${x},${y} ${x + rr},${y} L${x + w - rr},${y} Q${x + w},${y} ${x + w},${y + rr} L${x + w},${y + h} Z`;
+}
+
+/* ── Flow bar ──────────────────────────────────────────────────────────────
+   One line that answers "did more come in than went out?" before any number is
+   read. Widths are shares of the larger side, so the two are directly comparable. */
+export function FlowBar({ inAmount, outAmount }) {
+  const { currency } = useStore();
+  const max = Math.max(inAmount, outAmount, 1);
+  const w = (v) => `${Math.max(v > 0 ? 4 : 0, (v / max) * 100)}%`;
+
+  return (
+    <div className="flow">
+      <div className="flow-line">
+        <span className="flow-k">In</span>
+        <span className="flow-track"><i className="flow-fill tone-bg-in" style={{ width: w(inAmount) }} /></span>
+        <span className="flow-v num tone-text-in">{money(inAmount, currency)}</span>
+      </div>
+      <div className="flow-line">
+        <span className="flow-k">Out</span>
+        <span className="flow-track"><i className="flow-fill tone-bg-out" style={{ width: w(outAmount) }} /></span>
+        <span className="flow-v num tone-text-out">{money(outAmount, currency)}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ── Progress ring ─────────────────────────────────────────────────────────
+   Used where the figure is a share of a whole (savings rate, goal progress) —
+   a ring reads as "part of something" in a way a bar does not. */
+export function Ring({ value = 0, size = 62, stroke = 7, color = 'var(--in)', label, sub }) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const v = Math.max(0, Math.min(1, value));
+
+  return (
+    <div className="ring" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--track)" strokeWidth={stroke} />
+        <circle
+          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+          strokeLinecap="round" strokeDasharray={`${c * v} ${c}`}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          className="ring-arc"
+        />
+      </svg>
+      <div className="ring-text">
+        <span className="ring-v num">{label}</span>
+        {sub && <span className="ring-s">{sub}</span>}
+      </div>
+    </div>
+  );
+}
+
+/* ── Spend by category ─────────────────────────────────────────────────────
+   Each category owns a hue from the fixed categorical order, so it keeps the
+   same colour everywhere and across re-sorts; bar length carries the magnitude,
+   and a budget shows as a tick the fill either stops short of or overruns. */
+export function CategoryBars({ rows, max, order = [], onPick }) {
   const { currency } = useStore();
   if (!rows?.length) return null;
   const ceiling = max || Math.max(...rows.map((r) => r.total), 1);
 
-  return rows.map((r) => {
-    const over = r.budget > 0 && r.total > r.budget;
-    return (
-      <div className="bar-row" key={r.name}>
-        <span className="name">{r.name}</span>
-        <span className="val tabular">{money(r.total, currency)}</span>
-        <span className="bar-track">
-          <span
-            className="bar-fill"
-            style={{ width: `${Math.max(2, (r.total / ceiling) * 100)}%`, background: over ? 'var(--out)' : 'var(--save)' }}
-          />
-        </span>
-        <span className="bar-sub">
-          {Math.round(r.share * 100)}% of spend
-          {r.budget > 0 && ` · budget ${money(r.budget, currency)}${over ? ' — over' : ''}`}
-        </span>
-      </div>
-    );
-  });
+  return (
+    <div className="cats">
+      {rows.map((r) => {
+        const over = r.budget > 0 && r.total > r.budget;
+        const hue = hueFor(r.name, order);
+        const budgetAt = r.budget > 0 ? Math.min(100, (r.budget / ceiling) * 100) : null;
+        const Tag = onPick ? 'button' : 'div';
+
+        return (
+          <Tag
+            className="cat"
+            key={r.name}
+            {...(onPick ? { type: 'button', onClick: () => onPick(r) } : {})}
+          >
+            <span className="cat-chip" style={{ background: hue }}>{initialsOf(r.name)}</span>
+            <span className="cat-body">
+              <span className="cat-top">
+                <span className="cat-name">{r.name}</span>
+                <span className="cat-amt num">{money(r.total, currency)}</span>
+              </span>
+              <span className="cat-track">
+                <span
+                  className="cat-fill"
+                  style={{ width: `${Math.max(3, (r.total / ceiling) * 100)}%`, background: hue }}
+                />
+                {budgetAt !== null && (
+                  <i className={`cat-tick${over ? ' cat-tick--over' : ''}`} style={{ left: `${budgetAt}%` }} />
+                )}
+              </span>
+              <span className="cat-sub">
+                <span>{Math.round(r.share * 100)}% of spend</span>
+                {r.budget > 0 && (
+                  <span className={over ? 'cat-over' : ''}>
+                    {over ? `over by ${money(r.total - r.budget, currency)}` : `${money(r.budget - r.total, currency)} of budget left`}
+                  </span>
+                )}
+              </span>
+            </span>
+          </Tag>
+        );
+      })}
+    </div>
+  );
 }
 
-/* Money in vs out across recent months. Two series on ONE shared money scale,
-   grouped bars, legend always present, latest month directly labelled. */
+/* ── Money in vs out across recent months ──────────────────────────────────
+   Two series on ONE shared money scale, grouped bars, legend always present,
+   and the selected month read out in full underneath rather than in a tooltip
+   that a thumb would cover. */
 export function TrendChart({ data }) {
   const { currency } = useStore();
   const [active, setActive] = useState(null);
   if (!data?.length) return null;
 
   const max = Math.max(...data.flatMap((d) => [d.income, d.expense]), 1);
-  const W = 320, H = 132, padB = 20, padT = 16;
+  const W = 320, H = 138, padB = 22, padT = 18;
   const plot = H - padB - padT;
   const slot = W / data.length;
-  const barW = Math.min(13, slot / 3.4);
-  const gap = 2; // surface gap between adjacent fills
+  const barW = Math.min(12, slot / 3.6);
+  const gap = 3;
 
-  const shown = active != null ? data[active] : data.at(-1);
+  const idx = active != null ? active : data.length - 1;
+  const shown = data[idx];
 
   return (
     <div>
-      <div className="legend" style={{ marginBottom: 8 }}>
-        <span><i className="dot in" /> Money in</span>
-        <span><i className="dot out" /> Money out</span>
+      <div className="legend">
+        <span><i className="dot tone-bg-in" /> Money in</span>
+        <span><i className="dot tone-bg-out" /> Money out</span>
+        <span className="legend-max num">peak {compact(max)}</span>
       </div>
 
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img"
+      <svg className="trend" viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img"
            aria-label={`Money in and out, last ${data.length} months`}>
-        <line x1="0" y1={H - padB} x2={W} y2={H - padB} stroke="var(--grid)" strokeWidth="1" />
+        <line x1="0" y1={padT} x2={W} y2={padT} stroke="var(--grid)" strokeWidth="1" strokeDasharray="2 4" />
+        <line x1="0" y1={padT + plot / 2} x2={W} y2={padT + plot / 2} stroke="var(--grid)" strokeWidth="1" strokeDasharray="2 4" />
+        <line x1="0" y1={H - padB} x2={W} y2={H - padB} stroke="var(--grid-strong)" strokeWidth="1" />
+
         {data.map((d, i) => {
           const cx = i * slot + slot / 2;
           const hIn = (d.income / max) * plot;
           const hOut = (d.expense / max) * plot;
-          const isLast = i === data.length - 1;
+          const on = idx === i;
           return (
-            <g key={d.month} onMouseEnter={() => setActive(i)} onMouseLeave={() => setActive(null)}
+            <g key={d.month}
+               onMouseEnter={() => setActive(i)} onMouseLeave={() => setActive(null)}
                onClick={() => setActive(i)} style={{ cursor: 'pointer' }}>
+              {on && <rect x={i * slot + 2} y={padT - 12} width={slot - 4} height={H - padB - padT + 12} fill="var(--surface-3)" rx="9" />}
               <rect x={i * slot} y="0" width={slot} height={H} fill="transparent" />
-              {active === i && <rect x={i * slot} y="0" width={slot} height={H - padB} fill="var(--surface-hover)" rx="6" />}
-              <rect x={cx - barW - gap / 2} y={H - padB - hIn} width={barW} height={Math.max(hIn, d.income > 0 ? 2 : 0)}
-                    rx="4" fill="var(--in)" />
-              <rect x={cx + gap / 2} y={H - padB - hOut} width={barW} height={Math.max(hOut, d.expense > 0 ? 2 : 0)}
-                    rx="4" fill="var(--out)" />
-              <text x={cx} y={H - 6} textAnchor="middle" fontSize="10"
-                    fill={isLast || active === i ? 'var(--text-secondary)' : 'var(--text-muted)'}
-                    fontWeight={isLast ? 600 : 400}>
+              <path d={topRounded(cx - barW - gap / 2, H - padB - Math.max(hIn, d.income > 0 ? 3 : 0), barW, Math.max(hIn, d.income > 0 ? 3 : 0), 4)}
+                    fill="var(--in)" opacity={on ? 1 : .88} />
+              <path d={topRounded(cx + gap / 2, H - padB - Math.max(hOut, d.expense > 0 ? 3 : 0), barW, Math.max(hOut, d.expense > 0 ? 3 : 0), 4)}
+                    fill="var(--out)" opacity={on ? 1 : .88} />
+              <text x={cx} y={H - 6} textAnchor="middle" fontSize="10.5"
+                    fill={on ? 'var(--ink)' : 'var(--ink-3)'} fontWeight={on ? 650 : 500}>
                 {monthShort(d.month)}
               </text>
-              {(isLast || active === i) && d.income > 0 && (
-                <text x={cx - barW / 2 - gap / 2} y={H - padB - hIn - 4} textAnchor="middle" fontSize="9"
-                      fill="var(--text-secondary)" fontWeight="600">{compact(d.income)}</text>
-              )}
-              {(isLast || active === i) && d.expense > 0 && (
-                <text x={cx + barW / 2 + gap / 2} y={H - padB - hOut - 4} textAnchor="middle" fontSize="9"
-                      fill="var(--text-secondary)" fontWeight="600">{compact(d.expense)}</text>
-              )}
             </g>
           );
         })}
       </svg>
 
       {shown && (
-        <div className="strip" style={{ borderTop: '1px solid var(--border)', paddingTop: 9, marginTop: 2 }}>
-          <span className="k">{monthShort(shown.month)} — in / out</span>
-          <span className="v tabular">
-            <span style={{ color: 'var(--in)' }}>{money(shown.income, currency)}</span>
-            <span className="muted"> / </span>
-            <span style={{ color: 'var(--out)' }}>{money(shown.expense, currency)}</span>
+        <div className="trend-read">
+          <span className="trend-read-m">{monthShort(shown.month)}</span>
+          <span className="trend-read-v">
+            <span className="num tone-text-in">+{money(shown.income, currency)}</span>
+            <span className="num tone-text-out">−{money(shown.expense, currency)}</span>
           </span>
         </div>
       )}

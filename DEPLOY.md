@@ -1,6 +1,6 @@
 # Deploying My Hisab
 
-Backend → **Render** (free). Frontend → **Vercel** (free). Database → **MongoDB Atlas** (free).
+Backend → **Render** (free). Frontend → **Vercel** (free). Database → **Neon Postgres** (free).
 
 Do these in order — each step needs a URL from the one before it.
 
@@ -26,15 +26,16 @@ and secrets stay off GitHub. **Check that `server/.env` is not in the commit** �
 
 ---
 
-## 1. MongoDB Atlas — allow Render to connect
+## 1. Neon — get the connection string
 
-This is the step people miss. Render's free tier has **no fixed outbound IP**, so
-whitelisting "your" IP will not work once deployed.
+1. [console.neon.tech](https://console.neon.tech) → your project → **Connect**
+2. Copy the **pooled** connection string (the host ends in `-pooler`). Pooling
+   matters on Render's free tier, where the service restarts often.
+3. Keep `sslmode=verify-full` on the end of it.
 
-1. Atlas → **Network Access** → *Add IP Address*
-2. Choose **Allow access from anywhere** (`0.0.0.0/0`) → Confirm
-
-Your database is still protected by username + password.
+There is no IP allow-list to configure — Neon accepts connections from anywhere
+and relies on the password plus TLS. The four tables are created automatically
+the first time the API boots, so there is no schema to load by hand.
 
 ---
 
@@ -57,7 +58,7 @@ Your database is still protected by username + password.
 
 | Key | Value |
 |---|---|
-| `MONGODB_URI` | your full Atlas string, real password, `/hisab` before the `?` |
+| `DATABASE_URL` | your pooled Neon string, real password, `?sslmode=verify-full` on the end |
 | `JWT_SECRET` | a long random string (below) |
 | `NODE_ENV` | `production` |
 
@@ -166,22 +167,24 @@ To turn the ping off, set `KEEPALIVE=off`.
 
 ### Bringing your existing data across
 
-Your old entries were created before accounts existed, so they have no owner and
-won't show up. Hand them to your new account — run this **locally**, with
-`server/.env` pointing at the same Atlas database:
+Already have data in the old MongoDB Atlas database? Copy it over **locally**,
+with both `DATABASE_URL` and `MONGODB_URI` set in `server/.env`:
 
 ```bash
-npm run adopt -- your@email.com
+npm run migrate:mongo -- --dry    # read and report, write nothing
+npm run migrate:mongo             # do the copy
 ```
 
 ```
-[adopt] 14 transactions -> your@email.com
-[adopt] 3 savings buckets -> your@email.com
-[adopt] settings migrated
+[migrate] inserted  users 7/7  goals 3/3  settings 3/3  transactions 45/45
+[verify] amount total  mongo 54569  postgres 54569  MATCH
 ```
 
-Run it once, after signing up. To start fresh with the sample buckets instead:
-`npm run seed -- your@email.com`.
+Accounts come across with their passwords and their ids, so you sign in exactly
+as before. It is safe to re-run — rows already copied are skipped. Once the
+numbers look right in the app, drop `MONGODB_URI` and shut the cluster down.
+
+To start fresh with the sample buckets instead: `npm run seed -- your@email.com`.
 
 ---
 
@@ -191,8 +194,9 @@ Run it once, after signing up. To start fresh with the sample buckets instead:
 |---|---|
 | "blocked by CORS policy" in console | `CORS_ORIGINS` missing/mismatched on Render. Must match the Vercel URL exactly — `https://`, no trailing slash |
 | All API calls 404, or hit your Vercel URL | `VITE_API_URL` unset at build time. Set it and **redeploy** |
-| "Could not connect to database" in Render logs | Atlas Network Access isn't `0.0.0.0/0`, or the password isn't URL-encoded |
+| "Could not connect to database" in Render logs | `DATABASE_URL` is missing, or the password isn't URL-encoded |
 | Server won't boot: "JWT_SECRET must be set" | Add `JWT_SECRET` in Render |
 | First visit takes ~50s | Service was asleep. Confirm `SELF_URL` is set and check logs for `[keepalive]` |
 | Everyone signed out after a deploy | `JWT_SECRET` changed. Sign in again |
-| Password has `@`, `#`, `/` | URL-encode it in `MONGODB_URI` (`@`→`%40`, `#`→`%23`, `/`→`%2F`) |
+| Password has `@`, `#`, `/` | URL-encode it in `DATABASE_URL` (`@`→`%40`, `#`→`%23`, `/`→`%2F`) |
+| `self signed certificate` / TLS error at boot | The connection string lost its `?sslmode=verify-full` |

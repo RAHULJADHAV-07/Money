@@ -99,6 +99,8 @@ export const auth = {
 
 export const api = {
   summary: (month, today) => get(`/summary?month=${month}&today=${today}`),
+  calendar: (month) => get(`/summary/calendar?month=${month}`),
+  yearSummary: (year) => get(`/summary/year?year=${year}`),
   transactions: (params) => get(`/transactions?${new URLSearchParams(params)}`),
   createTx: (body) => post('/transactions', body),
   updateTx: (id, body) => put(`/transactions/${id}`, body),

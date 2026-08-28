@@ -1,11 +1,10 @@
 import 'dotenv/config';
-import mongoose from 'mongoose';
-import { connect } from './db.js';
-import User from './models/User.js';
-import Transaction from './models/Transaction.js';
-import Goal from './models/Goal.js';
-import Settings from './models/Settings.js';
-import { toDayUTC } from './lib/dates.js';
+import { connect, disconnect, one } from './db.js';
+import * as User from './models/User.js';
+import * as Goal from './models/Goal.js';
+import * as Settings from './models/Settings.js';
+import * as Transaction from './models/Transaction.js';
+import { toDayKey } from './lib/dates.js';
 
 // Carries over what was already in "Personal Money CheckUp.xlsx" plus the
 // goal buckets from "Hisab_Structure.xlsx". Safe to re-run: it only fills gaps.
@@ -22,41 +21,59 @@ const GOALS = [
 ];
 
 async function run() {
-  await connect(process.env.MONGODB_URI);
+  await connect(process.env.DATABASE_URL);
 
   const email = (process.argv[2] || '').trim().toLowerCase();
   if (!email) {
     console.error('Usage: npm run seed -- your@email.com   (sign up in the app first)');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
-  const user = await User.findOne({ email });
+  const user = await User.findByEmail(email);
   if (!user) {
     console.error(`No account found for ${email}. Sign up in the app first, then re-run this.`);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
-  const settings = await Settings.load(user._id);
-  settings.categories = ['Housing', 'Food', 'Transport', 'Utilities', 'Entertainment', 'Health', 'Shopping', 'Misc'];
-  settings.sources = ['Salary', 'Freelance', 'Investment', 'Mom', 'Dad', 'Other'];
-  await settings.save();
+  await Settings.load(user.id);
+  await Settings.save(user.id, {
+    categories: ['Housing', 'Food', 'Transport', 'Utilities', 'Entertainment', 'Health', 'Shopping', 'Misc'],
+    sources: ['Salary', 'Freelance', 'Investment', 'Mom', 'Dad', 'Other'],
+  });
   console.log('[seed] settings ready');
 
   for (const g of GOALS) {
-    const existing = await Goal.findOne({ name: g.name, user: user._id });
-    if (existing) { console.log(`[seed] goal "${g.name}" already there`); continue; }
-    await Goal.create({ ...g, user: user._id });
+    if (await Goal.findByName(user.id, g.name)) { console.log(`[seed] goal "${g.name}" already there`); continue; }
+    await Goal.create({ userId: user.id, ...g });
     console.log(`[seed] goal "${g.name}" created`);
   }
 
   for (const t of OPENING) {
-    const dupe = await Transaction.findOne({ user: user._id, kind: t.kind, amount: t.amount, person: t.person || '', date: toDayUTC(t.date) });
+    const dupe = await one(
+      `select 1 from transactions
+        where user_id = $1 and kind = $2 and amount = $3 and person = $4 and date = $5`,
+      [user.id, t.kind, t.amount, t.person || '', toDayKey(t.date)]
+    );
     if (dupe) { console.log(`[seed] "${t.note}" already there`); continue; }
-    await Transaction.create({ ...t, user: user._id, date: toDayUTC(t.date), method: 'Cash' });
+    await Transaction.create(user.id, {
+      kind: t.kind,
+      amount: t.amount,
+      date: toDayKey(t.date),
+      category: '',
+      source: t.source || '',
+      person: t.person || '',
+      goal: null,
+      note: t.note,
+      method: 'Cash',
+      toMethod: '',
+    });
     console.log(`[seed] added ${t.kind} ${t.amount} ${t.person || t.source}`);
   }
 
-  await mongoose.disconnect();
   console.log('[seed] done');
 }
 
-run().catch((err) => { console.error('[seed] ' + err.message); process.exit(1); });
+run()
+  .catch((err) => { console.error('[seed] ' + err.message); process.exitCode = 1; })
+  .finally(() => disconnect().catch(() => {}));

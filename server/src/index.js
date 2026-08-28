@@ -67,7 +67,7 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-connect(process.env.MONGODB_URI)
+connect(process.env.DATABASE_URL)
   .then(() => app.listen(PORT, () => {
     console.log(`[api] listening on ${PORT}`);
     if (allowed.length) console.log(`[cors] allowing ${allowed.join(', ')}`);

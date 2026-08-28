@@ -1,13 +1,13 @@
 {
   "name": "hisab-server",
-  "version": "1.0.1",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "seed": "node src/seed.js",
-    "adopt": "node src/adopt.js"
+    "migrate:mongo": "node src/migrate-from-mongo.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -15,6 +15,9 @@
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
     "mongoose": "^8.20.1"
   }
 }

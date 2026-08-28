@@ -1,67 +1,108 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, getToken } from '../lib/api.js';
 import { useStore } from '../lib/store.jsx';
 import { useAuth } from '../lib/auth.jsx';
+import { useTheme, THEMES } from '../lib/theme.js';
 import { money } from '../lib/format.js';
+import {
+  IconSun, IconMoon, IconAuto, IconDownload, IconLogout, IconClose, IconPlus,
+  IconWallet, IconTag, IconTarget, IconUser, IconInfo,
+} from '../components/Icons.jsx';
 
-function ListEditor({ label, hint, items, onChange }) {
-  const [draft, setDraft] = useState('');
+const THEME_ICON = { system: <IconAuto />, light: <IconSun />, dark: <IconMoon /> };
+
+// Everything the settings form owns, in one place, so "has this changed?" is a
+// single comparison rather than a field-by-field one.
+const draftOf = (s) => ({
+  currency: s.currency,
+  openingBalance: s.openingBalance,
+  openingBalances: { ...(s.openingBalances || {}) },
+  categories: [...s.categories],
+  sources: [...s.sources],
+  methods: [...s.methods],
+  budgets: { ...(s.budgets || {}) },
+});
+
+function ListEditor({ label, hint, placeholder, items, onChange }) {
+  const [text, setText] = useState('');
   const add = () => {
-    const v = draft.trim();
+    const v = text.trim();
     if (v && !items.includes(v)) onChange([...items, v]);
-    setDraft('');
+    setText('');
   };
+
   return (
     <div className="field">
-      <label>{label}</label>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 9 }}>
+      <span className="field-label">{label}</span>
+      <div className="tags">
         {items.map((c) => (
-          <span key={c} className="chip" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span key={c} className="tag">
             {c}
-            <button onClick={() => onChange(items.filter((x) => x !== c))} aria-label={`Remove ${c}`}
-                    style={{ color: 'var(--text-muted)', fontSize: 15, lineHeight: 1 }}>×</button>
+            <button className="tag-x" onClick={() => onChange(items.filter((x) => x !== c))} aria-label={`Remove ${c}`}>
+              <IconClose />
+            </button>
           </span>
         ))}
+        {!items.length && <span className="tags-empty">None yet</span>}
       </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input className="input" value={draft} placeholder="Add new…" onChange={(e) => setDraft(e.target.value)}
-               onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), add())} />
-        <button className="btn" onClick={add} disabled={!draft.trim()}>Add</button>
+      <div className="add-row">
+        <input
+          className="input" value={text} placeholder={placeholder || 'Add new…'}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), add())}
+        />
+        <button className="btn btn--icon" onClick={add} disabled={!text.trim()} aria-label={`Add ${label}`}>
+          <IconPlus />
+        </button>
       </div>
       {hint && <div className="hint">{hint}</div>}
     </div>
   );
 }
 
+function NumberRow({ label, value, onChange, currency }) {
+  return (
+    <label className="num-row">
+      <span className="num-row-k">{label}</span>
+      <span className="num-row-field">
+        <span className="num-row-cur">{currency}</span>
+        <input
+          className="input input--num" type="number" inputMode="decimal" placeholder="0"
+          value={value ?? ''} onChange={(e) => onChange(e.target.value)}
+        />
+      </span>
+    </label>
+  );
+}
+
 export default function Settings() {
   const { settings, refresh, notify } = useStore();
   const { user, signOut } = useAuth();
+  const [theme, setTheme] = useTheme();
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [theme, setTheme] = useState(() => localStorage.getItem('hisab.theme') || 'system');
 
   useEffect(() => {
-    if (settings) {
-      setDraft({
-        currency: settings.currency,
-        openingBalance: settings.openingBalance,
-        categories: settings.categories,
-        sources: settings.sources,
-        methods: settings.methods,
-        budgets: settings.budgets || {},
-      });
-    }
+    if (settings) setDraft(draftOf(settings));
   }, [settings]);
 
-  useEffect(() => {
-    if (theme === 'system') document.documentElement.removeAttribute('data-theme');
-    else document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('hisab.theme', theme);
-  }, [theme]);
+  const dirty = useMemo(
+    () => !!(settings && draft) && JSON.stringify(draftOf(settings)) !== JSON.stringify(draft),
+    [settings, draft]
+  );
 
-  if (!draft) return <div className="page"><div className="skeleton" style={{ height: 200, marginTop: 16 }} /></div>;
+  if (!draft) {
+    return (
+      <div className="page">
+        <div className="skel" style={{ height: 120, marginTop: 14 }} />
+        <div className="skel" style={{ height: 220, marginTop: 14 }} />
+      </div>
+    );
+  }
 
   const set = (patch) => setDraft({ ...draft, ...patch });
+  const openingTotal = Object.values(draft.openingBalances || {}).reduce((n, v) => n + (Number(v) || 0), 0);
+  const budgetTotal = Object.values(draft.budgets || {}).reduce((n, v) => n + (Number(v) || 0), 0);
 
   // The export endpoint is authenticated, so fetch it with the token and hand
   // the browser a blob rather than linking straight to the URL.
@@ -95,87 +136,118 @@ export default function Settings() {
   }
 
   return (
-    <div className="page">
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="card-head"><h2>Appearance</h2></div>
-        <div className="chips">
-          {['system', 'light', 'dark'].map((t) => (
-            <button key={t} className="chip" aria-pressed={theme === t} onClick={() => setTheme(t)}
-                    style={{ textTransform: 'capitalize' }}>{t}</button>
+    <div className={`page ${dirty ? 'page--savebar' : ''}`}>
+      <div className="card">
+        <div className="card-head"><h2 className="card-title">Appearance</h2></div>
+        <div className="theme-picker">
+          {THEMES.map((t) => (
+            <button key={t} className="theme-opt" aria-pressed={theme === t} onClick={() => setTheme(t)}>
+              <span className={`theme-swatch theme-swatch--${t}`} aria-hidden="true" />
+              <span className="theme-opt-ico">{THEME_ICON[t]}</span>
+              <span className="theme-opt-label">{t}</span>
+            </button>
           ))}
         </div>
       </div>
 
       <div className="card">
-        <div className="card-head"><h2>Money</h2></div>
-        <div className="row-2">
-          <div className="field">
-            <label htmlFor="cur">Currency symbol</label>
-            <input id="cur" className="input" value={draft.currency} onChange={(e) => set({ currency: e.target.value })} />
-          </div>
-          <div className="field">
-            <label htmlFor="ob">Opening balance</label>
-            <input id="ob" className="input" type="number" inputMode="decimal" value={draft.openingBalance}
-                   onChange={(e) => set({ openingBalance: e.target.value })} />
-          </div>
+        <div className="card-head">
+          <h2 className="card-title"><span className="card-ico"><IconWallet /></span>Wallets</h2>
+          <span className="card-sub num">{money(openingTotal, draft.currency)} opening</span>
         </div>
-        <div className="hint">
-          Opening balance is the cash you already had before you started logging here. Everything you add moves up or down from it.
+        <p className="hint hint--lead">
+          What each wallet held before you started logging here. Everything you add moves up or down from these.
+        </p>
+        {draft.methods.map((m) => (
+          <NumberRow
+            key={m} label={m} currency={draft.currency}
+            value={draft.openingBalances[m]}
+            onChange={(v) => set({ openingBalances: { ...draft.openingBalances, [m]: v } })}
+          />
+        ))}
+        <div className="divider" />
+        <ListEditor
+          label="Payment methods" placeholder="Cash, UPI, Bank…"
+          items={draft.methods} onChange={(methods) => set({ methods })}
+        />
+        <div className="field">
+          <label className="field-label" htmlFor="cur">Currency symbol</label>
+          <input id="cur" className="input input--short" value={draft.currency}
+                 onChange={(e) => set({ currency: e.target.value })} />
         </div>
       </div>
 
       <div className="card">
-        <div className="card-head"><h2>Categories & sources</h2></div>
-        <ListEditor label="Expense categories" items={draft.categories} onChange={(categories) => set({ categories })} />
+        <div className="card-head">
+          <h2 className="card-title"><span className="card-ico"><IconTag /></span>Categories &amp; sources</h2>
+        </div>
+        <ListEditor
+          label="Expense categories" placeholder="Food, Transport…"
+          items={draft.categories} onChange={(categories) => set({ categories })}
+        />
         <div className="divider" />
-        <ListEditor label="Income sources" items={draft.sources} onChange={(sources) => set({ sources })} />
-        <div className="divider" />
-        <ListEditor label="Payment methods" items={draft.methods} onChange={(methods) => set({ methods })} />
+        <ListEditor
+          label="Income sources" placeholder="Salary, Freelance…"
+          items={draft.sources} onChange={(sources) => set({ sources })}
+        />
       </div>
 
       <div className="card">
-        <div className="card-head"><h2>Monthly budgets</h2></div>
-        <div className="hint" style={{ marginTop: -6, marginBottom: 12 }}>
-          Optional. A category that goes over its budget turns orange on the dashboard.
+        <div className="card-head">
+          <h2 className="card-title"><span className="card-ico"><IconTarget /></span>Monthly budgets</h2>
+          {budgetTotal > 0 && <span className="card-sub num">{money(budgetTotal, draft.currency)} total</span>}
         </div>
+        <p className="hint hint--lead">
+          Optional. A category that goes over its budget is flagged on the dashboard.
+        </p>
         {draft.categories.map((c) => (
-          <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <span style={{ flex: 1, fontSize: 13.5 }}>{c}</span>
-            <input
-              className="input" type="number" inputMode="decimal" placeholder="0"
-              style={{ width: 120, textAlign: 'right' }}
-              value={draft.budgets[c] ?? ''}
-              onChange={(e) => set({ budgets: { ...draft.budgets, [c]: e.target.value } })}
-            />
-          </div>
+          <NumberRow
+            key={c} label={c} currency={draft.currency}
+            value={draft.budgets[c]}
+            onChange={(v) => set({ budgets: { ...draft.budgets, [c]: v } })}
+          />
         ))}
       </div>
 
-      <button className="btn btn-in btn-block" style={{ marginTop: 14 }} onClick={save} disabled={saving}>
-        {saving ? 'Saving…' : 'Save settings'}
-      </button>
-
       <div className="card">
-        <div className="card-head"><h2>Account</h2></div>
+        <div className="card-head"><h2 className="card-title"><span className="card-ico"><IconUser /></span>Account</h2></div>
         <div className="account-row">
-          <span className="avatar in">{(user?.name || '?').slice(0, 1).toUpperCase()}</span>
-          <span className="who">
+          <span className="avatar avatar--md tone-in">{(user?.name || '?').slice(0, 1).toUpperCase()}</span>
+          <span className="account-who">
             <span className="nm">{user?.name}</span>
             <span className="em">{user?.email}</span>
           </span>
-          <button className="btn btn-sm" onClick={signOut}>Sign out</button>
+          <button className="btn btn--sm btn--ghost" onClick={signOut}>
+            <IconLogout />Sign out
+          </button>
         </div>
       </div>
 
       <div className="card">
-        <div className="card-head"><h2>Your data</h2></div>
-        <button className="btn btn-block" onClick={downloadCsv}>Download everything as CSV</button>
-        <div className="hint">Saves a spreadsheet-ready file with every entry you have logged.</div>
+        <div className="card-head"><h2 className="card-title">Your data</h2></div>
+        <button className="btn btn--block" onClick={downloadCsv}><IconDownload />Download everything as CSV</button>
+        <p className="hint">Saves a spreadsheet-ready file with every entry you have logged.</p>
       </div>
 
-      <div className="empty" style={{ padding: '22px 10px' }}>
-        <div className="s">My Hisab · v{__APP_VERSION__}<br />Add to home screen for the full app experience.</div>
+      <div className="about">
+        <span className="about-ico"><IconInfo /></span>
+        Add My Hisab to your home screen for the full app experience — it works offline and
+        syncs whatever you logged the moment you are back online.
       </div>
+
+      {dirty && (
+        <div className="savebar" role="status">
+          <span className="savebar-text">You have unsaved changes</span>
+          <div className="btn-row">
+            <button className="btn btn--sm btn--ghost" onClick={() => setDraft(draftOf(settings))} disabled={saving}>
+              Discard
+            </button>
+            <button className="btn btn--sm btn--primary" onClick={save} disabled={saving}>
+              {saving ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

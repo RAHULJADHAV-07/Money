@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import Transaction from '../models/Transaction.js';
-import Goal from '../models/Goal.js';
+import * as Transaction from '../models/Transaction.js';
+import * as Goal from '../models/Goal.js';
 import { KINDS, KIND_LIST } from '../lib/kinds.js';
-import { toDayUTC, monthRange } from '../lib/dates.js';
+import { toDayKey, dayKey, monthRange } from '../lib/dates.js';
 import { wrap } from '../lib/async.js';
 
 const router = Router();
@@ -19,9 +19,10 @@ function clean(body) {
   const doc = {
     kind,
     amount: Math.round(amount * 100) / 100,
-    date: toDayUTC(body.date),
+    date: toDayKey(body.date),
     note: String(body.note || '').trim(),
     method: String(body.method || 'Cash').trim(),
+    toMethod: '',
     category: '', source: '', person: '', goal: null,
   };
 
@@ -34,66 +35,60 @@ function clean(body) {
     doc.person = String(body.person || '').trim();
     if (!doc.person) throw Object.assign(new Error('A name is required for borrowed/lent entries'), { status: 400 });
   }
+  if (needs === 'transfer') {
+    doc.toMethod = String(body.toMethod || '').trim();
+    if (!doc.toMethod) throw Object.assign(new Error('Choose where the money is going'), { status: 400 });
+    if (doc.toMethod === doc.method) {
+      throw Object.assign(new Error('A transfer needs two different wallets'), { status: 400 });
+    }
+  }
   return doc;
 }
 
 router.get('/', wrap(async (req, res) => {
-  const { month, from, to, kind, kinds, person, category, q } = req.query;
+  const { month, from, to, kind, kinds, person, category, method, q } = req.query;
   const limit = Math.min(Number(req.query.limit) || 100, 500);
   const skip = Number(req.query.skip) || 0;
-  const filter = { user: req.userId };
+  const filters = { kind, person, category, method, q };
 
   if (month) {
-    const { start, end } = monthRange(month);
-    filter.date = { $gte: start, $lt: end };
-  } else if (from || to) {
-    filter.date = {};
-    if (from) filter.date.$gte = toDayUTC(from);
-    if (to) filter.date.$lte = toDayUTC(to);
+    const range = monthRange(month);
+    filters.from = dayKey(range.start);
+    filters.before = dayKey(range.end);
+  } else {
+    if (from) filters.from = toDayKey(from);
+    if (to) filters.to = toDayKey(to);
   }
+  if (kinds) filters.kinds = String(kinds).split(',').filter((k) => KIND_LIST.includes(k));
 
-  if (kind) filter.kind = kind;
-  if (kinds) filter.kind = { $in: String(kinds).split(',').filter((k) => KIND_LIST.includes(k)) };
-  if (person) filter.person = person;
-  if (category) filter.category = category;
-  if (q) filter.$or = [
-    { note: new RegExp(q, 'i') }, { person: new RegExp(q, 'i') },
-    { category: new RegExp(q, 'i') }, { source: new RegExp(q, 'i') },
-  ];
-
-  const [items, total] = await Promise.all([
-    Transaction.find(filter).sort({ date: -1, createdAt: -1 }).skip(skip).limit(limit).populate('goal', 'name color').lean(),
-    Transaction.countDocuments(filter),
-  ]);
-  res.json({ items, total, hasMore: skip + items.length < total });
+  const { items, total } = await Transaction.list(req.userId, filters, { limit, skip });
+  res.json({ items: items.map(Transaction.toJSON), total, hasMore: skip + items.length < total });
 }));
 
 // A goal id from the client must belong to the caller, or it could skew someone else's totals.
 async function assertOwnGoal(goalId, userId) {
   if (!goalId) return;
-  const owned = await Goal.exists({ _id: goalId, user: userId });
-  if (!owned) throw Object.assign(new Error('That savings bucket does not exist'), { status: 400 });
+  if (!(await Goal.ownedBy(goalId, userId))) {
+    throw Object.assign(new Error('That savings bucket does not exist'), { status: 400 });
+  }
 }
 
 router.post('/', wrap(async (req, res) => {
   const doc = clean(req.body);
   await assertOwnGoal(doc.goal, req.userId);
-  const created = await Transaction.create({ ...doc, user: req.userId });
-  res.status(201).json(await created.populate('goal', 'name color'));
+  res.status(201).json(Transaction.toJSON(await Transaction.create(req.userId, doc)));
 }));
 
 router.put('/:id', wrap(async (req, res) => {
   const doc = clean(req.body);
   await assertOwnGoal(doc.goal, req.userId);
-  const updated = await Transaction.findOneAndUpdate({ _id: req.params.id, user: req.userId }, doc, {
-    new: true, runValidators: true,
-  }).populate('goal', 'name color');
+  const updated = await Transaction.update(req.params.id, req.userId, doc);
   if (!updated) return res.status(404).json({ error: 'Transaction not found' });
-  res.json(updated);
+  res.json(Transaction.toJSON(updated));
 }));
 
 router.delete('/:id', wrap(async (req, res) => {
-  const gone = await Transaction.findOneAndDelete({ _id: req.params.id, user: req.userId });
+  const gone = await Transaction.remove(req.params.id, req.userId);
   if (!gone) return res.status(404).json({ error: 'Transaction not found' });
   res.json({ ok: true, id: req.params.id });
 }));

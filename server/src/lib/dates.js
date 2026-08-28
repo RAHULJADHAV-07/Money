@@ -16,6 +16,9 @@ export function startOfToday() {
 }
 
 export const dayKey = (d) => new Date(d).toISOString().slice(0, 10);
+
+// What a DATE column wants: the calendar day as 'YYYY-MM-DD', no clock, no zone.
+export const toDayKey = (input) => dayKey(toDayUTC(input));
 export const monthKey = (d) => new Date(d).toISOString().slice(0, 7);
 
 // "2026-08" -> [2026-08-01, 2026-09-01)

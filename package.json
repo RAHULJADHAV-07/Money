@@ -1,6 +1,6 @@
 {
   "name": "hisab",
-  "version": "1.0.1",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "description": "Personal money tracker \u2014 daily transactions, borrowed & lent, savings and balance.",
@@ -12,6 +12,6 @@
     "build": "npm run build --prefix client",
     "seed": "npm run seed --prefix server --",
     "start": "npm run build && npm start --prefix server",
-    "adopt": "npm run adopt --prefix server --"
+    "migrate:mongo": "npm run migrate:mongo --prefix server --"
   }
 }

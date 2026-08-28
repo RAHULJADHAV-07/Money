@@ -3,7 +3,7 @@
 A mobile-first PWA for daily money tracking: **daily transactions, borrowed & lent,
 money received, savings, and balance** — the five things you asked for, on one screen.
 
-React (Vite) · Node/Express · MongoDB Atlas · accounts · installable · works offline.
+React (Vite) · Node/Express · Neon Postgres · accounts · installable · works offline.
 
 **Deploying to Render + Vercel? See [DEPLOY.md](DEPLOY.md).**
 
@@ -11,15 +11,16 @@ React (Vite) · Node/Express · MongoDB Atlas · accounts · installable · work
 
 ## 1. Fill in `server/.env`
 
-Replace `<db_password>` with your real Atlas password:
+Paste the connection string from your Neon project (**Dashboard → Connect**, the
+pooled one):
 
 ```
-MONGODB_URI=mongodb+srv://Cluster0:YOUR_PASSWORD@cluster0.shect.mongodb.net/hisab?retryWrites=true&w=majority&appName=Cluster0
+DATABASE_URL=postgresql://USER:PASSWORD@ep-xxxx-pooler.REGION.aws.neon.tech/neondb?sslmode=verify-full
 JWT_SECRET=any-long-random-string
 ```
 
-If the password contains `@ : / ? # [ ] %`, URL-encode it (`@` → `%40`, `#` → `%23`).
-In Atlas, also allow your IP under **Network Access**.
+The tables are created on first boot, so there is nothing to set up by hand.
+Neon has no IP allow-list to configure.
 
 ## 2. Install and run
 
@@ -33,9 +34,10 @@ Open **http://localhost:5173** and **create an account**.
 Then bring in your data:
 
 ```bash
-npm run adopt -- your@email.com   # claims data created before accounts existed
-npm run seed  -- your@email.com   # or: start with the sample buckets
+npm run seed -- your@email.com    # start with the sample buckets
 ```
+
+Coming from the old MongoDB version? See **Moving from MongoDB** below.
 
 ## 3. Install it as an app
 
@@ -68,6 +70,9 @@ your cash:
 | Paid back | you repaid them | ↓ (your debt shrinks) |
 | Saved | moved into savings | ↓ |
 | Withdrew | taken out of savings | ↑ |
+| Waived off | they owed you, you agreed to drop it | — |
+| Forgiven | you owed them, they dropped it | — |
+| Transfer | moved between your own wallets | — |
 
 From that one list everything else is derived:
 
@@ -76,14 +81,21 @@ From that one list everything else is derived:
 - **To receive** = lent − got back, *per person* (one settled friend never hides another's dues)
 - **To pay** = borrowed − paid back, per person
 - **Net worth** = balance + savings + to receive − to pay
+- **Each wallet** (Cash / UPI / Bank / Card) = its opening figure + everything that
+  touched it + transfers in − transfers out. The wallets always add up to the balance.
+
+The last three kinds move no cash. A settlement clears a debt by agreement, so what
+someone owes drops but your balance does not. A transfer shifts money between your
+own wallets, so the per-wallet figures change and the total stays put.
 
 Because it is one ledger, nothing can drift out of sync the way separate sheets do.
 
 ## Accounts
 
 Every account sees only its own money. Each transaction, savings bucket, and
-settings document carries a `user` id, and every query filters on the signed-in
-user — so two people can share one deployment without seeing each other's data.
+settings row carries a `user_id` foreign key, and every query filters on the
+signed-in user — so two people can share one deployment without seeing each
+other's data.
 
 Sign-in uses a token stored in the browser (valid 30 days), sent as an
 `Authorization` header. Passwords are hashed with bcrypt and never leave the server.
@@ -91,12 +103,15 @@ Sign-in uses a token stored in the browser (valid 30 days), sent as an
 ## What is where
 
 ```
-server/          Express API + Mongoose models
+server/          Express API + SQL data layer
   src/lib/kinds.js      the ledger kinds and their cash direction — the core rule
   src/lib/auth.js       token signing + the guard on every data route
   src/lib/keepalive.js  the self-ping that stops Render's free tier sleeping
   src/routes/           auth, transactions, summary, people, goals, settings, csv
-  src/seed.js           sample data · src/adopt.js  claims pre-account data
+  src/schema.sql        the four tables, created on boot
+  src/db.js             the Postgres pool and query helpers
+  src/models/           one query module per table, plus the JSON shapes the client reads
+  src/seed.js           sample data · src/migrate-from-mongo.js  one-shot import
 client/          React PWA
   src/pages/            Login, Home, Ledger, People, Savings, Settings
   src/lib/api.js        API calls, auth token, offline queue
@@ -107,9 +122,15 @@ client/          React PWA
 ## Day to day
 
 - **+ button** — add anything, from any screen. Amount first, everything else optional.
-- **Home** — balance, what you owe and are owed, spend by category, last 6 months.
-- **Ledger** — every entry, grouped by day, filterable and searchable.
-- **People** — one row per person with a running balance; tap to settle up.
+- **Home** — balance, what you owe and are owed, **where your money sits** (per wallet), spend by category, last 6 months.
+- **Ledger** — every entry, grouped by day, filterable by kind and by wallet, searchable.
+- **Calendar** — tap the month name anywhere to open it. Three views:
+  **Day** (that date's totals and entries), **Month** (a grid shaded by daily spend,
+  green dot where money came in), and **Year** (12 months with spend bars). The
+  ‹ › arrows always step by whichever unit you are looking at — a day at a time in
+  Day view, a month in Month view, a year in Year view.
+- **People** — one row per person with a running balance; tap to settle up, in cash or
+  by agreement with **Settle without payment**.
 - **Savings** — buckets like Emergency fund or Trip, each with a target.
 - **Settings** — categories, income sources, budgets, theme, and **CSV export**.
 
@@ -129,3 +150,33 @@ stays readable offline too.
 - Savings buckets (Emergency Fund, Trip Fund, Health Insurance) from *Hisab_Structure*
 
 It is safe to run more than once — it only fills in what is missing.
+
+## Moving from MongoDB
+
+Earlier versions stored everything in MongoDB Atlas. The data now lives in
+**Neon Postgres**, in four tables: `users`, `settings`, `goals`, `transactions`
+(see [server/src/schema.sql](server/src/schema.sql)). Nothing about the API or
+the app changed — only what is behind it.
+
+To bring an old Atlas database across, put both connection strings in
+`server/.env` and run the one-shot import:
+
+```bash
+npm run migrate:mongo -- --dry    # read and report, write nothing
+npm run migrate:mongo             # do the copy
+```
+
+It dumps the source to `server/mongo-backup-<date>.json` first, then copies
+users → goals → settings → transactions and prints a row count and an amount
+total for both sides so you can see they agree.
+
+Two details worth knowing:
+
+- **Ids are carried over unchanged.** Rows keep their original Mongo ObjectId
+  as their primary key, so anyone already signed in stays signed in — their
+  token still points at the same account. New rows get a UUID.
+- **It is safe to re-run.** Every row is keyed by that id and skipped if it is
+  already there, so a second pass copies only what is missing.
+
+Once you have checked the numbers in the app, `MONGODB_URI` can be deleted from
+`server/.env` and the Atlas cluster shut down. The app itself never reads it.

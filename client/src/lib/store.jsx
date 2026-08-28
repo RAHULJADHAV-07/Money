@@ -13,6 +13,8 @@ export function StoreProvider({ children }) {
   const [pending, setPending] = useState(pendingCount);
   const [toast, setToast] = useState(null);
   const [addSheet, setAddSheet] = useState(null);      // { kind, person, goal, tx } | null
+  const [monthSheet, setMonthSheet] = useState(false);
+  const [day, setDay] = useState(null);                // 'YYYY-MM-DD' when one day is picked
   const toastTimer = useRef();
 
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
@@ -48,12 +50,20 @@ export function StoreProvider({ children }) {
     };
   }, [notify, refresh]);
 
+  // Changing month by any route clears a day filter belonging to the old month.
+  const changeMonth = useCallback((m) => {
+    setMonth(m);
+    setDay((d) => (d && d.slice(0, 7) === m ? d : null));
+  }, []);
+
   const value = useMemo(() => ({
-    settings, month, setMonth, version, refresh,
+    settings, month, setMonth: changeMonth, version, refresh,
+    day, setDay,
+    monthSheet, openMonthSheet: () => setMonthSheet(true), closeMonthSheet: () => setMonthSheet(false),
     online, pending, toast, notify,
     addSheet, openAdd: (opts = {}) => setAddSheet(opts), closeAdd: () => setAddSheet(null),
     currency: settings?.currency || '₹',
-  }), [settings, month, version, online, pending, toast, notify, addSheet]);
+  }), [settings, month, changeMonth, day, monthSheet, version, online, pending, toast, notify, addSheet, refresh]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
