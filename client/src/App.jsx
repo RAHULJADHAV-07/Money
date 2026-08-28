@@ -1,5 +1,5 @@
 import { Component, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, useLocation, useSearchParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { StoreProvider, useStore } from './lib/store.jsx';
 import { AuthProvider, useAuth } from './lib/auth.jsx';
 import { useTheme } from './lib/theme.js';
@@ -16,6 +16,7 @@ import Transactions from './pages/Transactions.jsx';
 import People from './pages/People.jsx';
 import Savings from './pages/Savings.jsx';
 import Settings from './pages/Settings.jsx';
+import Privacy from './pages/Privacy.jsx';
 import { monthLabel, monthShort, shiftMonth, monthKeyNow, dayLabel } from './lib/format.js';
 
 const TITLES = {
@@ -110,7 +111,9 @@ function AppFooter() {
   return (
     <footer className="app-footer">
       <div>Maintained &amp; developed by <span className="brand">Avita Technologies</span></div>
-      <div className="ver">My Hisab · v{__APP_VERSION__}</div>
+      <div className="ver">
+        My Hisab · v{__APP_VERSION__} · <Link className="linkish" to="/privacy-policy">Privacy</Link>
+      </div>
     </footer>
   );
 }
@@ -242,9 +245,19 @@ function Gate() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <Gate />
-      </AuthProvider>
+      <Routes>
+        {/* Public: a privacy policy you can only read once you have handed over
+            your details is no use, and Google's consent screen must reach it. */}
+        <Route path="/privacy-policy" element={<Privacy />} />
+        <Route
+          path="*"
+          element={(
+            <AuthProvider>
+              <Gate />
+            </AuthProvider>
+          )}
+        />
+      </Routes>
     </BrowserRouter>
   );
 }

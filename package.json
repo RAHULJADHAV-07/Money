@@ -1,6 +1,6 @@
 {
   "name": "hisab",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "type": "module",
   "description": "Personal money tracker — daily transactions, borrowed & lent, savings and balance.",

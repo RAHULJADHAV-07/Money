@@ -1554,3 +1554,68 @@ select.input {
   margin: 8px 0 18px;
   font-size: 13px; line-height: 1.6; color: var(--ink-2);
 }
+
+/* ── Legal pages (privacy policy) ──────────────────────────────────────────
+   Standalone: these render outside the app shell, with no nav and no month
+   pill, so they carry their own page frame. */
+.legal {
+  min-height: 100dvh;
+  background: var(--canvas);
+  padding: calc(env(safe-area-inset-top) + 28px) var(--gutter)
+           calc(40px + env(safe-area-inset-bottom));
+}
+.legal-inner { max-width: 680px; margin: 0 auto; }
+
+.legal-head { text-align: center; margin-bottom: 26px; }
+.legal-mark {
+  display: grid; place-items: center;
+  width: 46px; height: 46px; margin: 0 auto 14px;
+  border-radius: 14px;
+  background: var(--in); color: #fff;
+  font-size: 23px; font-weight: 700;
+}
+.legal-title { font-size: 27px; font-weight: 700; letter-spacing: -.035em; }
+.legal-meta { font-size: 12.5px; color: var(--ink-3); margin-top: 6px; }
+
+.legal-lede {
+  padding: 16px 18px; margin-bottom: 30px;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--in) var(--tint), transparent);
+  border: 1px solid color-mix(in srgb, var(--in) 22%, transparent);
+  font-size: 14px; line-height: 1.65; color: var(--ink);
+}
+
+.legal-sec { margin-bottom: 28px; }
+.legal-sec h2 {
+  font-size: 16.5px; font-weight: 680; letter-spacing: -.022em;
+  padding-bottom: 9px; margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.legal-sec h3 {
+  font-size: 13.5px; font-weight: 650; color: var(--ink);
+  margin-bottom: 6px;
+}
+.legal-sec p {
+  font-size: 14px; line-height: 1.7; color: var(--ink-2);
+  margin-bottom: 11px;
+}
+.legal-sec p:last-child { margin-bottom: 0; }
+.legal-sec ul { list-style: none; margin: 0 0 11px; }
+.legal-sec li {
+  position: relative; padding-left: 18px; margin-bottom: 8px;
+  font-size: 14px; line-height: 1.65; color: var(--ink-2);
+}
+.legal-sec li::before {
+  content: ''; position: absolute; left: 3px; top: .62em;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--line-2);
+}
+.legal-group { margin-bottom: 16px; }
+.legal-sec a { color: var(--in); font-weight: 580; }
+
+.legal-foot {
+  margin-top: 36px; padding-top: 24px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+}
+.legal-foot p { font-size: 12px; color: var(--ink-3); margin-top: 16px; }
+.legal-foot .brand { font-weight: 620; color: var(--ink-2); }

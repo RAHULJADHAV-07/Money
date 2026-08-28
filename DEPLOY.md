@@ -60,6 +60,8 @@ the first time the API boots, so there is no schema to load by hand.
 |---|---|
 | `DATABASE_URL` | your pooled Neon string, real password, `?sslmode=verify-full` on the end |
 | `GOOGLE_CLIENT_ID` | optional — same value as the frontend's `VITE_GOOGLE_CLIENT_ID` (see README) |
+| `BREVO_API_KEY` | optional — Brevo API key, for the welcome email (see README) |
+| `MAIL_FROM` / `APP_URL` | optional — a Brevo-verified sender, and where the email's links point |
 | `JWT_SECRET` | a long random string (below) |
 | `NODE_ENV` | `production` |
 

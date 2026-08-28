@@ -13,6 +13,7 @@ import settings from './routes/settings.js';
 import exportRoutes from './routes/export.js';
 import { requireAuth } from './lib/auth.js';
 import { startKeepAlive } from './lib/keepalive.js';
+import { mailEnabled, sender } from './lib/mail.js';
 import { KINDS } from './lib/kinds.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -72,6 +73,7 @@ connect(process.env.DATABASE_URL)
   .then(() => app.listen(PORT, () => {
     console.log(`[api] listening on ${PORT}`);
     if (allowed.length) console.log(`[cors] allowing ${allowed.join(', ')}`);
+    console.log(`[mail] ${mailEnabled() ? `sending as ${sender().name} <${sender().email}>` : 'not configured — welcome emails are skipped'}`);
     startKeepAlive();
   }))
   .catch((err) => {

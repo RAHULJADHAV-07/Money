@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
 import { IconCheck } from '../components/Icons.jsx';
 import GoogleButton from '../components/GoogleButton.jsx';
@@ -149,7 +150,9 @@ export default function Login() {
 
       <footer className="app-footer">
         <div>Maintained &amp; developed by <span className="brand">Avita Technologies</span></div>
-        <div className="ver">My Hisab · v{__APP_VERSION__}</div>
+        <div className="ver">
+          My Hisab · v{__APP_VERSION__} · <Link className="linkish" to="/privacy-policy">Privacy</Link>
+        </div>
       </footer>
     </div>
   );

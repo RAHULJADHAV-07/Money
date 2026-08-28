@@ -255,3 +255,57 @@ is looked up.
 | "Google sign-in is not configured on this server" | `GOOGLE_CLIENT_ID` missing on the API |
 | "That Google sign-in could not be verified" | The two ids do not match each other |
 | `403 access_denied` | Consent screen is in *Testing* and that address is not in Test users |
+
+## The welcome email
+
+When someone creates an account — by password or with Google — they get one
+email. Once, on creation only: signing in again sends nothing, and linking
+Google to an account that already existed sends nothing either. There is no
+marketing mail of any kind.
+
+It is off until `BREVO_API_KEY` is set, and signup works exactly the same either
+way — mail is never allowed to decide whether an account gets created.
+
+**Setting it up with Brevo**
+
+Sending goes over Brevo's HTTP API rather than SMTP: nothing for a host to block
+on an outbound port, and a readable JSON error when something is wrong.
+
+1. **Verify your phone.** Brevo blocks all sending until you do — the banner at
+   the top of the dashboard is the prompt for it.
+2. **Verify the sender address.** *Senders, Domains & IPs → Senders → Add a
+   sender*, then click the link Brevo emails you. The address here must be the
+   one in `MAIL_FROM`, or Brevo refuses the message.
+3. **Create an API key.** *SMTP & API → API Keys → Generate a new API key.*
+4. Put both in `server/.env`:
+
+```
+BREVO_API_KEY=xkeysib-…
+MAIL_FROM=My Hisab <your-verified-sender@example.com>
+APP_URL=https://your-app.vercel.app
+```
+
+On Render, set the same three in the dashboard. The boot log tells you which
+state it is in:
+
+```
+[mail] sending as My Hisab <you@example.com>
+[mail] not configured — welcome emails are skipped
+```
+
+The free plan allows 300 emails a day, far beyond what this app sends. When a
+send fails the reason is logged and says what to fix — a rejected key, an
+unverified sender, or no credit left — and the signup itself is unaffected.
+
+## Privacy policy
+
+Served at `/privacy-policy`, and deliberately **outside** the sign-in gate: a
+policy you can only read after handing over your details is no use, and Google's
+OAuth consent screen has to be able to fetch it. It is linked from the footer of
+both the sign-in screen and the app.
+
+The text in [client/src/pages/Privacy.jsx](client/src/pages/Privacy.jsx)
+describes what this code actually does — the fields it stores, the three
+providers that hold them, what is kept in the browser, and the fact that there
+are no analytics or trackers anywhere in it. If you change what the app
+collects, change that page too.

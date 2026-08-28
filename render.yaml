@@ -19,6 +19,12 @@ services:
         generateValue: true        # Render generates a strong random secret
       - key: GOOGLE_CLIENT_ID
         sync: false                # same value as the frontend's VITE_GOOGLE_CLIENT_ID
+      - key: BREVO_API_KEY
+        sync: false                # Brevo API key — never commit this
+      - key: MAIL_FROM
+        sync: false                # My Hisab <verified-sender@example.com>
+      - key: APP_URL
+        sync: false                # https://your-app.vercel.app (links inside emails)
       - key: CORS_ORIGINS
         sync: false                # https://your-app.vercel.app
       - key: SELF_URL

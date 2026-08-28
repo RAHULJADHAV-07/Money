@@ -3,6 +3,7 @@ import * as User from '../models/User.js';
 import * as Settings from '../models/Settings.js';
 import { signToken, requireAuth, optionalUserId } from '../lib/auth.js';
 import { verifyGoogleToken, googleEnabled } from '../lib/google.js';
+import { sendWelcome } from '../lib/welcome-email.js';
 import { wrap } from '../lib/async.js';
 
 const router = Router();
@@ -17,6 +18,18 @@ async function preCreateSettings(user) {
   } catch (err) {
     console.warn(`[auth] could not pre-create settings for ${user.email}: ${err.message}`);
   }
+}
+
+/* Sent once, when the account is first created — never on a later sign-in, and
+   never when Google is merely linked to an account that already existed.
+
+   Deliberately not awaited: a slow or broken mail server must not hold up the
+   signup response, and an account that exists is an account that exists whether
+   or not the greeting arrived. */
+function welcome(user) {
+  sendWelcome(user).catch((err) => {
+    console.warn(`[auth] welcome email to ${user.email} failed: ${err.message}`);
+  });
 }
 
 // Lets the sign-in screen know whether to draw the Google button at all.
@@ -37,6 +50,7 @@ router.post('/signup', wrap(async (req, res) => {
 
   const user = await User.create({ name, email, passwordHash: await User.hash(password) });
   await preCreateSettings(user);
+  welcome(user);
 
   res.status(201).json({ token: signToken(user.id), user: User.toSafeJSON(user) });
 }));
@@ -74,7 +88,10 @@ router.post('/google', wrap(async (req, res) => {
   const linkTo = optionalUserId(req);
 
   const { user, outcome } = await User.resolveGoogleIdentity(profile, { linkTo });
-  if (outcome === 'created') await preCreateSettings(user);
+  if (outcome === 'created') {
+    await preCreateSettings(user);
+    welcome(user);
+  }
 
   res.status(outcome === 'created' ? 201 : 200).json({
     token: signToken(user.id),
