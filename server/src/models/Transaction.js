@@ -2,11 +2,15 @@ import { one, many } from '../db.js';
 import { DEBT_KINDS } from '../lib/kinds.js';
 
 /* Every read joins the bucket, so `goal` always comes back as the small object
-   the client renders ({_id, name, color}) rather than a bare id. */
+   the client renders ({_id, name, color}) rather than a bare id. The split a
+   row belongs to rides along the same way, so the ledger can fold a group's
+   parts back into one row without a second round trip. */
 const SELECT = `
-  select t.*, g.name as goal_name, g.color as goal_color
+  select t.*, g.name as goal_name, g.color as goal_color,
+         tg.title as group_title, tg.received as group_received, tg.paid as group_paid
     from transactions t
-    left join goals g on g.id = t.goal_id`;
+    left join goals g on g.id = t.goal_id
+    left join tx_groups tg on tg.id = t.group_id`;
 
 export const toJSON = (t) => ({
   _id: t.id,
@@ -21,6 +25,9 @@ export const toJSON = (t) => ({
   note: t.note,
   method: t.method,
   toMethod: t.to_method,
+  group: t.group_id
+    ? { _id: t.group_id, title: t.group_title ?? '', received: t.group_received ?? 0, paid: t.group_paid ?? 0 }
+    : null,
   createdAt: t.created_at,
   updatedAt: t.updated_at,
 });
@@ -69,12 +76,18 @@ export async function list(userId, filters, { limit, skip }) {
 export const findOne = (id, userId) =>
   one(`${SELECT} where t.id = $1 and t.user_id = $2`, [id, userId]);
 
+/* Shared by the plain create below and by a split's parts, so a part is stored
+   exactly like a standalone entry -- which is the whole point of the design:
+   every total in the app already knows how to count it. */
+export const INSERT_PART = `
+  insert into transactions (user_id, group_id, date, kind, amount, category, source, person, goal_id, note, method, to_method)
+  values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning id`;
+
+export const partValues = (userId, groupId, doc) =>
+  [userId, groupId, doc.date, doc.kind, doc.amount, doc.category, doc.source, doc.person, doc.goal, doc.note, doc.method, doc.toMethod];
+
 export async function create(userId, doc) {
-  const row = await one(
-    `insert into transactions (user_id, date, kind, amount, category, source, person, goal_id, note, method, to_method)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning id`,
-    [userId, doc.date, doc.kind, doc.amount, doc.category, doc.source, doc.person, doc.goal, doc.note, doc.method, doc.toMethod]
-  );
+  const row = await one(INSERT_PART, partValues(userId, null, doc));
   return findOne(row.id, userId);
 }
 
@@ -96,6 +109,10 @@ export const recent = (userId, limit) =>
 
 export const allForExport = (userId) =>
   many(`${SELECT} where t.user_id = $1 order by t.date asc, t.created_at asc`, [userId]);
+
+// A split's parts, in the order they were written.
+export const partsOf = (groupId, userId) =>
+  many(`${SELECT} where t.group_id = $1 and t.user_id = $2 order by t.created_at asc, t.id asc`, [groupId, userId]);
 
 export const personHistory = (userId, person) =>
   many(
@@ -175,13 +192,15 @@ export const transferIn = (userId) =>
 /* Per-wallet movement, for the balance check on save. `excludeId` leaves the
    entry being edited out, so raising a 100 to 150 is measured against the
    wallet without that 100 in it rather than against itself. */
-export const walletMovement = (userId, excludeId = null) =>
+export const walletMovement = (userId, excludeId = null, excludeGroupId = null) =>
   many(
     `select method as wallet, kind, sum(amount) as total
        from transactions
-      where user_id = $1 and ($2::text is null or id <> $2)
+      where user_id = $1
+        and ($2::text is null or id <> $2)
+        and ($3::text is null or group_id is distinct from $3)
       group by method, kind`,
-    [userId, excludeId]
+    [userId, excludeId, excludeGroupId]
   );
 
 export const walletTransferIn = (userId, excludeId = null) =>

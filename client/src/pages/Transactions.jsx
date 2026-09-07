@@ -31,10 +31,18 @@ export default function Transactions() {
     [month, day, filter, q]
   );
 
-  // Entries saved while offline aren't on the server yet — show them inline.
+  /* Entries saved while offline aren't on the server yet — show them inline. A
+     queued split arrives as one write holding its parts; it is unpacked back
+     into rows so the ledger can fold it the same way it folds a saved one. */
   const queued = pendingWrites()
-    .filter((w) => w.method === 'POST' && w.path === '/transactions')
-    .map((w) => ({ ...w.body, _id: w.id, queued: true, goal: null }));
+    .filter((w) => w.method === 'POST' && (w.path === '/transactions' || w.path === '/transactions/group'))
+    .flatMap((w) => {
+      if (w.path === '/transactions') return [{ ...w.body, _id: w.id, queued: true, goal: null, group: null }];
+      const group = { _id: w.id, title: w.body.title, received: w.body.received, paid: w.body.paid };
+      return w.body.parts.map((p, i) => ({
+        ...p, _id: `${w.id}-${i}`, date: w.body.date, queued: true, goal: null, group,
+      }));
+    });
 
   const items = [...queued, ...(data?.items || [])];
   const spent = items.filter((t) => t.kind === 'expense').reduce((n, t) => n + t.amount, 0);

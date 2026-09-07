@@ -108,14 +108,26 @@ export const api = {
   summary: (month, today) => get(`/summary?month=${month}&today=${today}`),
   /* Just the wallet balances, for checking an entry against the wallet paying
      for it. `exclude` leaves out the entry being edited, so its own old amount
-     is not counted against its new one. */
-  wallets: (exclude) => get(`/summary/wallets${exclude ? `?exclude=${encodeURIComponent(exclude)}` : ''}`),
+     is not counted against its new one; `excludeGroup` does the same for every
+     part of a split being edited. */
+  wallets: (exclude, excludeGroup) => {
+    const q = new URLSearchParams();
+    if (exclude) q.set('exclude', exclude);
+    if (excludeGroup) q.set('excludeGroup', excludeGroup);
+    const s = q.toString();
+    return get(`/summary/wallets${s ? `?${s}` : ''}`);
+  },
   calendar: (month) => get(`/summary/calendar?month=${month}`),
   yearSummary: (year) => get(`/summary/year?year=${year}`),
   transactions: (params) => get(`/transactions?${new URLSearchParams(params)}`),
   createTx: (body) => post('/transactions', body),
   updateTx: (id, body) => put(`/transactions/${id}`, body),
   deleteTx: (id) => del(`/transactions/${id}`),
+  // A split and its parts save as one call, so a half-written one cannot exist.
+  group: (id) => get(`/transactions/group/${id}`),
+  createGroup: (body) => post('/transactions/group', body),
+  updateGroup: (id, body) => put(`/transactions/group/${id}`, body),
+  deleteGroup: (id) => del(`/transactions/group/${id}`),
   people: () => get('/people'),
   person: (name) => get(`/people/${encodeURIComponent(name)}`),
   goals: () => get('/goals'),

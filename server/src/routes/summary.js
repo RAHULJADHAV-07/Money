@@ -173,9 +173,12 @@ router.get('/', wrap(async (req, res) => {
    old amount is not counted against its new one. */
 router.get('/wallets', wrap(async (req, res) => {
   const exclude = req.query.exclude || null;
+  // Editing a split leaves out all of its parts, not one row: the balances have
+  // to be the ones the split will be re-measured against.
+  const excludeGroup = req.query.excludeGroup || null;
   const [settingsRow, movement, transferIn] = await Promise.all([
     Settings.load(req.userId),
-    Transaction.walletMovement(req.userId, exclude),
+    Transaction.walletMovement(req.userId, exclude, excludeGroup),
     Transaction.walletTransferIn(req.userId, exclude),
   ]);
 

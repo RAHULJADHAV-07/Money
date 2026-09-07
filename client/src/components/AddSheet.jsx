@@ -4,13 +4,13 @@ import { api } from '../lib/api.js';
 import { useStore } from '../lib/store.jsx';
 import { KINDS, ADD_ORDER, isSettle, dirOf } from '../lib/kinds.js';
 import { todayKey, money } from '../lib/format.js';
-import { IconTrash } from './Icons.jsx';
+import { IconTrash, IconSplit, IconChevronRight } from './Icons.jsx';
 import Alert from './Alert.jsx';
 
 const TONE_OF = (kind) => KINDS[kind]?.tone || 'out';
 
 export default function AddSheet() {
-  const { addSheet, closeAdd, settings, refresh, notify, currency } = useStore();
+  const { addSheet, closeAdd, openSplit, settings, refresh, notify, currency } = useStore();
   const editing = addSheet?.tx || null;
 
   const [kind, setKind] = useState(addSheet?.kind || 'expense');
@@ -186,6 +186,20 @@ export default function AddSheet() {
           </button>
         ))}
       </div>
+
+      {/* One payment can mean several things at once — half yours, half theirs,
+          or a repayment that came back with extra. That does not fit one kind,
+          so it gets its own sheet rather than a mode of this one. */}
+      {!editing && (
+        <button type="button" className="splitcue" onClick={() => openSplit({})}>
+          <span className="splitcue-ico"><IconSplit /></span>
+          <span className="splitcue-body">
+            <b>Was it more than one thing?</b>
+            <span>A bill you shared, or money that was partly one thing and partly another.</span>
+          </span>
+          <IconChevronRight />
+        </button>
+      )}
 
       <div className="field field--lead">
         <label className="field-label" htmlFor="amt">Amount</label>

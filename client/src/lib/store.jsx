@@ -13,6 +13,7 @@ export function StoreProvider({ children }) {
   const [pending, setPending] = useState(pendingCount);
   const [toast, setToast] = useState(null);
   const [addSheet, setAddSheet] = useState(null);      // { kind, person, goal, tx } | null
+  const [splitSheet, setSplitSheet] = useState(null);  // { groupId } | {} for a new split
   const [monthSheet, setMonthSheet] = useState(false);
   const [day, setDay] = useState(null);                // 'YYYY-MM-DD' when one day is picked
   const toastTimer = useRef();
@@ -71,8 +72,11 @@ export function StoreProvider({ children }) {
     monthSheet, openMonthSheet: () => setMonthSheet(true), closeMonthSheet: () => setMonthSheet(false),
     online, pending, toast, notify,
     addSheet, openAdd: (opts = {}) => setAddSheet(opts), closeAdd: () => setAddSheet(null),
+    splitSheet,
+    openSplit: (opts = {}) => { setAddSheet(null); setSplitSheet(opts); },
+    closeSplit: () => setSplitSheet(null),
     currency: settings?.currency || '₹',
-  }), [settings, month, changeMonth, day, monthSheet, version, online, pending, toast, notify, addSheet, refresh]);
+  }), [settings, month, changeMonth, day, monthSheet, version, online, pending, toast, notify, addSheet, splitSheet, refresh]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

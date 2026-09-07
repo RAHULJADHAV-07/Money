@@ -31,6 +31,29 @@ export async function many(text, params) {
   return rows;
 }
 
+/* Several writes that must land together or not at all -- a split entry and its
+   parts. The pool hands out a different connection per query, so a transaction
+   has to hold one client for the whole run. `fn` gets the same one/many helpers
+   as the rest of the app, bound to that client. */
+export async function tx(fn) {
+  const client = await db().connect();
+  try {
+    await client.query('begin');
+    const out = await fn({
+      query: (text, params) => client.query(text, params),
+      one: async (text, params) => (await client.query(text, params)).rows[0] || null,
+      many: async (text, params) => (await client.query(text, params)).rows,
+    });
+    await client.query('commit');
+    return out;
+  } catch (err) {
+    await client.query('rollback').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export async function connect(url) {
   if (!url) {
     throw new Error('DATABASE_URL is not set — copy .env.example to .env and paste your Neon connection string');

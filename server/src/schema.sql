@@ -79,3 +79,60 @@ create index if not exists goals_user_idx        on goals (user_id);
 create index if not exists tx_user_date_idx      on transactions (user_id, date desc, created_at desc);
 create index if not exists tx_user_kind_idx      on transactions (user_id, kind);
 create index if not exists tx_user_person_idx    on transactions (user_id, person, kind);
+
+/* ── Split entries ─────────────────────────────────────────────────────────
+   One real-world event whose money means several things at once — a shared
+   bill you paid with someone else's cash, a repayment that came back with a
+   little extra on top. The group holds what actually changed hands; its parts
+   are ordinary rows in `transactions`, each with its own true kind.
+
+   The group deliberately lives in its own table rather than as a parent row in
+   `transactions`. Every aggregate in the app sums transaction rows by kind, so
+   a container row sitting among them would have to be excluded from each one,
+   forever — and a single missed exclusion silently double-counts money. Kept
+   apart, the parts are just rows, and every existing total stays correct.     */
+create table if not exists tx_groups (
+  id         text primary key default gen_random_uuid()::text,
+  user_id    text not null references users(id) on delete cascade,
+  date       date not null,
+  title      text not null default '',
+  note       text not null default '',
+  -- What came into your hand, and what left it. The parts must add up to these.
+  received   double precision not null default 0 check (received >= 0),
+  paid       double precision not null default 0 check (paid >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table transactions add column if not exists group_id text;
+
+/* A part belongs to its group for life: deleting the split deletes its parts.
+   The constraint is added on its own rather than inline above, because
+   `add column if not exists` skips the entire statement -- REFERENCES clause
+   included -- on a database that already has the column, which would leave the
+   parts of a split with nothing tying them to it. Guarded by name, so this
+   repairs such a database on its next boot instead of failing on a duplicate. */
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'transactions_group_id_fkey') then
+    alter table transactions
+      add constraint transactions_group_id_fkey
+      foreign key (group_id) references tx_groups(id) on delete cascade;
+  end if;
+end $$;
+
+/* The headline figure the event actually had -- the bill, or the amount handed
+   over. `received`/`paid` are what the parts must reconcile to, which is not
+   always the same number: a bill someone else paid moves no cash of yours, yet
+   the bill was still 1645. */
+alter table tx_groups add column if not exists total double precision not null default 0;
+
+/* What you typed, kept beside what it was turned into.
+   The parts are the ledger and stay the single source of truth for every total.
+   This is the other half: the answers you gave -- the bill, who paid, each
+   share -- so reopening a split shows you your own words again instead of the
+   ledger rows it derived. Nothing is ever computed from it. */
+alter table tx_groups add column if not exists form jsonb not null default '{}'::jsonb;
+
+create index if not exists tx_groups_user_idx on tx_groups (user_id, date desc);
+create index if not exists tx_group_idx       on transactions (group_id);

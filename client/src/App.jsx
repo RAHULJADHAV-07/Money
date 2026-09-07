@@ -10,6 +10,7 @@ import {
   IconCloudOff, IconSync, IconAlert, IconCheck,
 } from './components/Icons.jsx';
 import AddSheet from './components/AddSheet.jsx';
+import SplitSheet from './components/SplitSheet.jsx';
 import MonthSheet from './components/MonthSheet.jsx';
 import Home from './pages/Home.jsx';
 import Transactions from './pages/Transactions.jsx';
@@ -185,7 +186,7 @@ class ErrorBoundary extends Component {
 }
 
 function Shell() {
-  const { addSheet, openAdd, toast, monthSheet } = useStore();
+  const { addSheet, openAdd, toast, monthSheet, splitSheet } = useStore();
   return (
     <div className="app">
       <ScrollTop />
@@ -212,6 +213,7 @@ function Shell() {
       <Nav />
 
       {addSheet && <AddSheet key={addSheet.tx?._id || addSheet.kind || 'new'} />}
+      {splitSheet && <SplitSheet key={splitSheet.groupId || 'new-split'} />}
       {monthSheet && <MonthSheet />}
       {toast && (
         <div className="toast" role="status">
