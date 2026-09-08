@@ -3,6 +3,7 @@ import { api } from '../lib/api.js';
 import { useApi, useStore } from '../lib/store.jsx';
 import { money, moneyParts } from '../lib/format.js';
 import Sheet from '../components/Sheet.jsx';
+import Alert from '../components/Alert.jsx';
 import { Ring } from '../components/Charts.jsx';
 import { IconTarget, IconPlus, IconTrash, IconCheck } from '../components/Icons.jsx';
 
@@ -14,6 +15,7 @@ function GoalSheet({ goal, onClose }) {
   const [target, setTarget] = useState(goal ? String(goal.target || '') : '');
   const [color, setColor] = useState(goal?.color || COLORS[0]);
   const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   async function save() {
     if (!name.trim()) return;
@@ -28,7 +30,6 @@ function GoalSheet({ goal, onClose }) {
   }
 
   async function remove() {
-    if (!confirm(`Delete "${goal.name}"? The money stays in your savings total.`)) return;
     setBusy(true);
     await api.deleteGoal(goal._id);
     notify('Bucket deleted');
@@ -39,7 +40,7 @@ function GoalSheet({ goal, onClose }) {
   const footer = (
     <div className="btn-row">
       {goal && (
-        <button className="btn btn--danger btn--icon" onClick={remove} disabled={busy} aria-label="Delete bucket">
+        <button className="btn btn--danger btn--icon" onClick={() => setConfirmDelete(true)} disabled={busy} aria-label="Delete bucket">
           <IconTrash />
         </button>
       )}
@@ -76,6 +77,17 @@ function GoalSheet({ goal, onClose }) {
                onChange={(e) => setTarget(e.target.value)} placeholder="0" />
         <div className="hint">Leave blank if you just want to accumulate without a goal.</div>
       </div>
+
+      {confirmDelete && (
+        <Alert
+          danger tone="danger"
+          title={`Delete “${goal.name}”?`}
+          message="The bucket goes away. Everything you saved into it stays in your savings total, just without a name on it."
+          action="Delete" cancel="Keep it"
+          onConfirm={() => { setConfirmDelete(false); remove(); }}
+          onClose={() => setConfirmDelete(false)}
+        />
+      )}
 
       <div className="field">
         <span className="field-label">Colour</span>

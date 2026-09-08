@@ -37,11 +37,28 @@ async function raw(path, { method = 'GET', body, signal, skipAuthRedirect } = {}
     body: body ? JSON.stringify(body) : undefined,
     signal,
   });
+  /* Not every answer is JSON. During a deploy the API can briefly be a version
+     behind the app and reply with an HTML 404 to an endpoint it does not have
+     yet; a proxy or a captive portal can send a page of its own. Parsing that
+     blindly used to throw "Unexpected token '<'" at whoever was mid-entry. */
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  let data = null;
+  let unreadable = false;
+  if (text) {
+    try { data = JSON.parse(text); } catch { unreadable = true; }
+  }
 
   if (res.status === 401 && !skipAuthRedirect) onUnauthorized();
-  if (!res.ok) throw new ApiError(data?.error || `Request failed (${res.status})`, res.status, data?.code);
+
+  if (!res.ok) {
+    if (unreadable) {
+      throw res.status === 404
+        ? new ApiError('That is not available yet — the server may still be updating.', 404, 'API_BEHIND')
+        : new ApiError(`The server could not complete that (${res.status}).`, res.status, 'BAD_RESPONSE');
+    }
+    throw new ApiError(data?.error || `Request failed (${res.status})`, res.status, data?.code);
+  }
+  if (unreadable) throw new ApiError('The server sent something this app could not read.', res.status, 'BAD_RESPONSE');
   return data;
 }
 
@@ -91,6 +108,10 @@ export async function flushOutbox() {
   return { sent, failed, left: left.length };
 }
 
+// Unauthenticated, and the only call that works before signing in — it is how
+// the app finds out whether the API has caught up with it.
+export const health = () => raw('/health', { skipAuthRedirect: true });
+
 export const auth = {
   signup: (body) => raw('/auth/signup', { method: 'POST', body, skipAuthRedirect: true }),
   login: (body) => raw('/auth/login', { method: 'POST', body, skipAuthRedirect: true }),
@@ -130,6 +151,13 @@ export const api = {
   deleteGroup: (id) => del(`/transactions/group/${id}`),
   people: () => get('/people'),
   person: (name) => get(`/people/${encodeURIComponent(name)}`),
+  /* Saved entries you make over and over. `runRoutine` writes an ordinary
+     entry through the same rules as the add form -- it can be refused. */
+  routines: (today) => get(`/routines${today ? `?today=${today}` : ''}`),
+  createRoutine: (body) => post('/routines', body),
+  updateRoutine: (id, body) => put(`/routines/${id}`, body),
+  deleteRoutine: (id) => del(`/routines/${id}`),
+  runRoutine: (id, body) => post(`/routines/${id}/run`, body || {}),
   goals: () => get('/goals'),
   createGoal: (body) => post('/goals', body),
   updateGoal: (id, body) => put(`/goals/${id}`, body),

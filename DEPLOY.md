@@ -192,6 +192,39 @@ To start fresh with the sample buckets instead: `npm run seed -- your@email.com`
 
 ---
 
+## Shipping an update
+
+The frontend and the API deploy separately, so for a minute or two after a push
+one is newer than the other. Two things make that a non-event.
+
+**The app updates itself.** A browser only looks for a new service worker on a
+navigation, which a single-page app never does — so `client/src/lib/update.js`
+asks on its own: on launch, whenever the app returns to the foreground, when the
+connection comes back, and every 15 minutes. When a new version is found it
+reloads, but only once no sheet is open, so a reload never lands on a half-typed
+entry. Afterwards the **What's new** sheet shows what changed.
+
+**The app notices when the API is behind.** `/api/health` reports the server's
+version; if it is older than the app's, a banner says the update is still
+finishing and the screens that need the newer endpoints stay out of the way
+until it catches up. No reload needed — it clears itself within thirty seconds
+of the API coming up.
+
+So the order does not really matter. **Server first is still preferable**, since
+it shortens the window in which the banner shows at all.
+
+To release:
+
+1. Bump `version` in the three `package.json` files (root, `client`, `server`)
+2. Add an entry at the top of `client/src/lib/changelog.js`
+3. Push — Render and Vercel both rebuild
+
+> `client/vercel.json` keeps `sw.js`, `index.html` and the manifest on
+> `no-cache`, and hashed assets on a year. Without that, a cached shell would go
+> on pointing at the old bundle however fresh the service worker was.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause |

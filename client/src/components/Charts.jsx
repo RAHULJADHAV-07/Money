@@ -63,8 +63,7 @@ export function Ring({ value = 0, size = 62, stroke = 7, color = 'var(--in)', la
 
 /* ── Spend by category ─────────────────────────────────────────────────────
    Each category owns a hue from the fixed categorical order, so it keeps the
-   same colour everywhere and across re-sorts; bar length carries the magnitude,
-   and a budget shows as a tick the fill either stops short of or overruns. */
+   same colour everywhere and across re-sorts; bar length carries the magnitude. */
 export function CategoryBars({ rows, max, order = [], onPick }) {
   const { currency } = useStore();
   if (!rows?.length) return null;
@@ -73,9 +72,7 @@ export function CategoryBars({ rows, max, order = [], onPick }) {
   return (
     <div className="cats">
       {rows.map((r) => {
-        const over = r.budget > 0 && r.total > r.budget;
         const hue = hueFor(r.name, order);
-        const budgetAt = r.budget > 0 ? Math.min(100, (r.budget / ceiling) * 100) : null;
         const Tag = onPick ? 'button' : 'div';
 
         return (
@@ -95,17 +92,9 @@ export function CategoryBars({ rows, max, order = [], onPick }) {
                   className="cat-fill"
                   style={{ width: `${Math.max(3, (r.total / ceiling) * 100)}%`, background: hue }}
                 />
-                {budgetAt !== null && (
-                  <i className={`cat-tick${over ? ' cat-tick--over' : ''}`} style={{ left: `${budgetAt}%` }} />
-                )}
               </span>
               <span className="cat-sub">
                 <span>{Math.round(r.share * 100)}% of spend</span>
-                {r.budget > 0 && (
-                  <span className={over ? 'cat-over' : ''}>
-                    {over ? `over by ${money(r.total - r.budget, currency)}` : `${money(r.budget - r.total, currency)} of budget left`}
-                  </span>
-                )}
               </span>
             </span>
           </Tag>

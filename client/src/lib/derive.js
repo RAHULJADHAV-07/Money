@@ -19,20 +19,22 @@ const paise = (n) => Math.round((Number(n) || 0) * 100) / 100;
    One amount that meant more than one thing. Each reason is a plain sentence
    for something the ledger already knows how to record.                     */
 
+/* Kept short on purpose: each one sits on a single line beside its amount, and
+   a label that has to be truncated to fit is no clearer than no label at all. */
 export const REASONS = {
   in: [
-    { id: 'repaid',   label: 'Paying back what they owed me',  kind: 'repay_received', needs: 'person' },
-    { id: 'gift',     label: 'A gift or extra — mine to keep', kind: 'income',         needs: 'source' },
-    { id: 'toreturn', label: "Money I'll have to give back",   kind: 'borrowed',       needs: 'person' },
-    { id: 'waived',   label: 'Writing off the rest they owed', kind: 'settle_received', needs: 'person' },
-    { id: 'unsaved',  label: 'Taken out of savings',           kind: 'saving_out',     needs: 'goal' },
+    { id: 'repaid',   label: 'They repaid me',      kind: 'repay_received',  needs: 'person' },
+    { id: 'gift',     label: 'Extra, mine to keep', kind: 'income',          needs: 'source' },
+    { id: 'toreturn', label: 'I must give it back', kind: 'borrowed',        needs: 'person' },
+    { id: 'waived',   label: 'Written off',         kind: 'settle_received', needs: 'person' },
+    { id: 'unsaved',  label: 'Out of savings',      kind: 'saving_out',      needs: 'goal' },
   ],
   out: [
-    { id: 'bought',   label: 'Something I bought',             kind: 'expense',        needs: 'category' },
-    { id: 'repaying', label: 'Paying back what I owed them',   kind: 'repay_paid',     needs: 'person' },
-    { id: 'lending',  label: 'Lending it to them',             kind: 'lent',           needs: 'person' },
-    { id: 'forgiven', label: 'Forgiving the rest I owed',      kind: 'settle_paid',    needs: 'person' },
-    { id: 'saved',    label: 'Put into savings',               kind: 'saving_in',      needs: 'goal' },
+    { id: 'bought',   label: 'Something I bought',  kind: 'expense',         needs: 'category' },
+    { id: 'repaying', label: 'I repaid them',       kind: 'repay_paid',      needs: 'person' },
+    { id: 'lending',  label: 'Lent to them',        kind: 'lent',            needs: 'person' },
+    { id: 'forgiven', label: 'Forgiven',            kind: 'settle_paid',     needs: 'person' },
+    { id: 'saved',    label: 'Into savings',        kind: 'saving_in',       needs: 'goal' },
   ],
 };
 

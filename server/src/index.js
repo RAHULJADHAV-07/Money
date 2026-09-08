@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { connect } from './db.js';
 import auth from './routes/auth.js';
@@ -9,6 +10,7 @@ import transactions from './routes/transactions.js';
 import summary from './routes/summary.js';
 import people from './routes/people.js';
 import goals from './routes/goals.js';
+import routines from './routes/routines.js';
 import settings from './routes/settings.js';
 import exportRoutes from './routes/export.js';
 import { requireAuth } from './lib/auth.js';
@@ -17,6 +19,13 @@ import { mailEnabled, sender } from './lib/mail.js';
 import { KINDS } from './lib/kinds.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/* The frontend and the API deploy separately, so for a minute or two after a
+   push one can be newer than the other. Saying which version this is lets the
+   app notice, and say so, instead of calling endpoints that do not exist yet. */
+const { version: API_VERSION } = JSON.parse(
+  readFileSync(path.resolve(__dirname, '../package.json'), 'utf8')
+);
 const app = express();
 
 // The PWA is served from Vercel while the API lives on Render, so the browser
@@ -40,7 +49,12 @@ app.use(cors({
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, uptime: Math.round(process.uptime()), time: new Date().toISOString() });
+  res.json({
+    ok: true,
+    version: API_VERSION,
+    uptime: Math.round(process.uptime()),
+    time: new Date().toISOString(),
+  });
 });
 app.get('/api/kinds', (req, res) => res.json(KINDS));
 
@@ -51,6 +65,7 @@ app.use('/api/transactions', requireAuth, transactions);
 app.use('/api/summary', requireAuth, summary);
 app.use('/api/people', requireAuth, people);
 app.use('/api/goals', requireAuth, goals);
+app.use('/api/routines', requireAuth, routines);
 app.use('/api/settings', requireAuth, settings);
 app.use('/api/export', requireAuth, exportRoutes);
 

@@ -1,16 +1,37 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Sheet from './Sheet.jsx';
 import { api } from '../lib/api.js';
 import { useStore } from '../lib/store.jsx';
-import { KINDS, ADD_ORDER, isSettle, dirOf } from '../lib/kinds.js';
+import { KINDS, isSettle, dirOf } from '../lib/kinds.js';
 import { todayKey, money } from '../lib/format.js';
-import { IconTrash, IconSplit, IconChevronRight } from './Icons.jsx';
+import { IconTrash, IconSplit, IconChevronRight, KindIcon } from './Icons.jsx';
 import Alert from './Alert.jsx';
 
 const TONE_OF = (kind) => KINDS[kind]?.tone || 'out';
 
+/* Grouped by what the entry is about rather than listed flat. Eleven names in a
+   row is a wall; three short groups is a thing you can read. The headings are
+   also the fastest way to find a kind you have not used before — you know
+   whether it involves a person before you know what it is called. */
+const KIND_GROUPS = [
+  { label: 'Everyday', kinds: ['expense', 'income', 'transfer'] },
+  { label: 'With people', kinds: ['lent', 'borrowed', 'repay_received', 'repay_paid', 'settle_received', 'settle_paid'] },
+  { label: 'Savings', kinds: ['saving_in', 'saving_out'] },
+];
+
+// Asked in the words of whatever you are entering, which is when it means most.
+function splitCue(kind, person) {
+  const who = person.trim() || 'them';
+  if (kind === 'repay_received') return `Was some of it extra, on top of what ${who} owed?`;
+  if (kind === 'repay_paid') return `Was some of it extra, on top of what you owed ${who}?`;
+  if (kind === 'expense') return 'Was this a bill you shared?';
+  if (kind === 'income') return 'Was part of this owed to you?';
+  if (kind === 'lent' || kind === 'borrowed') return 'Was only part of it a loan?';
+  return 'Was it more than one thing?';
+}
+
 export default function AddSheet() {
-  const { addSheet, closeAdd, openSplit, settings, refresh, notify, currency } = useStore();
+  const { addSheet, closeAdd, openSplit, settings, refresh, notify, currency, apiBehind } = useStore();
   const editing = addSheet?.tx || null;
 
   const [kind, setKind] = useState(addSheet?.kind || 'expense');
@@ -27,9 +48,9 @@ export default function AddSheet() {
   const [people, setPeople] = useState([]);
   const [wallets, setWallets] = useState(null);
   const [alert, setAlert] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const chipsRef = useRef(null);
 
   useEffect(() => {
     api.goals().then((g) => setGoals(g.items)).catch(() => {});
@@ -68,20 +89,6 @@ export default function AddSheet() {
       if (addSheet?.note) setNote(addSheet.note);
     }
   }, [editing, addSheet]);
-
-  /* The chip row scrolls, and the sheet can open on a kind that sits well past
-     the fold — "Waived", say, opened from a person. Bring it into view, but only
-     when it is actually out of view, so tapping a visible chip never jumps. */
-  useEffect(() => {
-    const box = chipsRef.current;
-    const chip = box?.querySelector('[aria-pressed="true"]');
-    if (!box || !chip) return;
-    const left = chip.offsetLeft;
-    const right = left + chip.offsetWidth;
-    if (left < box.scrollLeft || right > box.scrollLeft + box.clientWidth) {
-      box.scrollTo({ left: left - (box.clientWidth - chip.offsetWidth) / 2, behavior: 'smooth' });
-    }
-  }, [kind]);
 
   const needs = KINDS[kind]?.needs;
   const categories = settings?.categories || [];
@@ -162,7 +169,6 @@ export default function AddSheet() {
   }
 
   async function remove() {
-    if (!confirm('Delete this entry?')) return;
     setSaving(true);
     try {
       await api.deleteTx(editing._id);
@@ -179,23 +185,50 @@ export default function AddSheet() {
     <Sheet title={title} subtitle={KINDS[kind]?.label} onClose={closeAdd}>
       {error && <div className="error-msg" role="alert">{error}</div>}
 
-      <div className="chips" ref={chipsRef}>
-        {ADD_ORDER.map((k) => (
-          <button key={k} className={`chip chip--${TONE_OF(k)}`} aria-pressed={kind === k} onClick={() => setKind(k)}>
-            {KINDS[k].short}
-          </button>
+      {/* Every type, wrapped rather than scrolled — nothing hidden off the side,
+          and no grid of tiles to wade through either. */}
+      <div className="kindpick">
+        {KIND_GROUPS.map((g) => (
+          <div className="kindgroup" key={g.label} role="radiogroup" aria-label={g.label}>
+            <span className="kindgroup-l">{g.label}</span>
+            <div className="kindrow">
+              {g.kinds.map((k) => (
+                <button
+                  key={k} type="button" role="radio" aria-checked={kind === k}
+                  className={`kpill kpill--${TONE_OF(k)}`}
+                  onClick={() => setKind(k)}
+                >
+                  <KindIcon kind={k} />
+                  {KINDS[k].short}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
 
       {/* One payment can mean several things at once — half yours, half theirs,
           or a repayment that came back with extra. That does not fit one kind,
-          so it gets its own sheet rather than a mode of this one. */}
-      {!editing && (
-        <button type="button" className="splitcue" onClick={() => openSplit({})}>
+          so it gets its own sheet. What you have typed goes across with you, so
+          realising halfway through does not mean starting again. */}
+      {!editing && !apiBehind && (
+        <button
+          type="button" className="splitcue"
+          onClick={() => openSplit({ from: {
+            kind, amount: Number(amount) || 0, person: person.trim(), method: effMethod,
+            category: needs === 'category' ? effCategory : '',
+            source: needs === 'source' ? effSource : '',
+            goal: needs === 'goal' ? (goal || '') : '',
+          } })}
+        >
           <span className="splitcue-ico"><IconSplit /></span>
           <span className="splitcue-body">
-            <b>Was it more than one thing?</b>
-            <span>A bill you shared, or money that was partly one thing and partly another.</span>
+            <b>{splitCue(kind, person)}</b>
+            <span>
+              {Number(amount) > 0
+                ? `Split this ${money(Number(amount), currency)} into the parts it was really made of.`
+                : 'A bill you shared, or money that was partly one thing and partly another.'}
+            </span>
           </span>
           <IconChevronRight />
         </button>
@@ -317,7 +350,7 @@ export default function AddSheet() {
 
       <div className="btn-row btn-row--form">
         {editing && (
-          <button className="btn btn--danger btn--icon" onClick={remove} disabled={saving} aria-label="Delete entry">
+          <button className="btn btn--danger btn--icon" onClick={() => setConfirmDelete(true)} disabled={saving} aria-label="Delete entry">
             <IconTrash />
           </button>
         )}
@@ -325,6 +358,17 @@ export default function AddSheet() {
           {saving ? 'Saving…' : editing ? 'Save changes' : KINDS[kind].cta}
         </button>
       </div>
+
+      {confirmDelete && (
+        <Alert
+          danger tone="danger"
+          title="Delete this entry?"
+          message={`${KINDS[kind]?.short} of ${money(Number(amount) || 0, currency)}${note.trim() ? ` — “${note.trim()}”` : ''}. This cannot be undone.`}
+          action="Delete" cancel="Keep it"
+          onConfirm={() => { setConfirmDelete(false); remove(); }}
+          onClose={() => setConfirmDelete(false)}
+        />
+      )}
 
       {alert && (
         <Alert title={alert.title} message={alert.message} onClose={() => setAlert(null)} />

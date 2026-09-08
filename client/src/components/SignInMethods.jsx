@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Alert from './Alert.jsx';
 import { auth as authApi } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { googleEnabled } from '../lib/google.js';
@@ -17,6 +18,7 @@ export default function SignInMethods({ notify }) {
   const [next, setNext] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [confirmUnlink, setConfirmUnlink] = useState(false);
 
   const hasPassword = !!user?.hasPassword;
   const hasGoogle = !!user?.google?.connected;
@@ -51,7 +53,6 @@ export default function SignInMethods({ notify }) {
   }
 
   async function disconnectGoogle() {
-    if (!confirm('Disconnect Google? You will sign in with your email and password instead.')) return;
     setBusy(true);
     setError('');
     try {
@@ -111,7 +112,7 @@ export default function SignInMethods({ notify }) {
               <span className="em">{hasGoogle ? 'Connected' : 'Not connected'}</span>
             </span>
             {hasGoogle && (
-              <button className="btn btn--sm btn--ghost" onClick={disconnectGoogle}
+              <button className="btn btn--sm btn--ghost" onClick={() => setConfirmUnlink(true)}
                       disabled={busy || !hasPassword}
                       title={hasPassword ? undefined : 'Set a password first'}>
                 Disconnect
@@ -133,6 +134,17 @@ export default function SignInMethods({ notify }) {
             ? 'Add a password so you can still get in without Google.'
             : 'Connect Google for a one-tap sign-in on your phone.'}
       </p>
+
+      {confirmUnlink && (
+        <Alert
+          danger tone="danger"
+          title="Disconnect Google?"
+          message="You will sign in with your email and password instead. Your data is untouched."
+          action="Disconnect" cancel="Stay connected"
+          onConfirm={() => { setConfirmUnlink(false); disconnectGoogle(); }}
+          onClose={() => setConfirmUnlink(false)}
+        />
+      )}
     </div>
   );
 }

@@ -29,7 +29,7 @@ router.get('/', wrap(async (req, res) => {
       Transaction.categoryAndSource(userId, monthStart, monthEnd),
       Transaction.monthlyTrend(userId, trendStart, monthEnd),
       Transaction.personTotals(userId),
-      Transaction.recent(userId, 8),
+      Transaction.recent(userId, 10),
       Transaction.transferIn(userId),
     ]);
 
@@ -155,7 +155,6 @@ router.get('/', wrap(async (req, res) => {
       total: c.total,
       count: c.count,
       share: monthExpense > 0 ? c.total / monthExpense : 0,
-      budget: settings.budgets?.[c.name] ?? 0,
     })),
     bySource: bySource.map((s) => ({ name: s.name || 'Other', total: s.total, count: s.count })),
     wallets,

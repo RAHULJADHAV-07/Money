@@ -492,12 +492,6 @@ svg { display: block; }
 }
 .strip .k { color: var(--ink-2); }
 .strip .v { font-weight: 640; letter-spacing: -.015em; }
-.strip--total {
-  border-top: 1px solid var(--line); margin-top: 8px; padding-top: 12px;
-}
-.strip--total .k { font-weight: 620; color: var(--ink); }
-.strip--total .v { font-size: 16px; font-weight: 700; }
-
 .kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
 .kv {
   background: var(--surface); border: 1px solid var(--line);
@@ -512,23 +506,6 @@ svg { display: block; }
 }
 .badge--in { background: color-mix(in oklab, var(--in) var(--tint), var(--surface)); color: var(--in); }
 .badge--out { background: color-mix(in oklab, var(--out) var(--tint), var(--surface)); color: var(--out); }
-
-/* ═══ Insight line ═════════════════════════════════════════════════════════ */
-.insight {
-  display: flex; gap: 10px; align-items: flex-start;
-  margin-top: 12px; padding: 11px 12px;
-  background: var(--surface-2); border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  font-size: 12.5px; color: var(--ink-2); line-height: 1.5;
-}
-.insight strong { color: var(--ink); font-weight: 650; }
-.insight-ico {
-  width: 22px; height: 22px; border-radius: 7px; flex: none;
-  display: grid; place-items: center;
-  background: color-mix(in oklab, var(--warn) var(--tint), var(--surface));
-  color: var(--warn);
-}
-.insight-ico svg { width: 13px; height: 13px; }
 
 .note-box {
   display: flex; gap: 10px; padding: 11px 13px; margin-bottom: 14px;
@@ -639,9 +616,6 @@ svg { display: block; }
 .flow-fill { display: block; height: 100%; border-radius: var(--r-pill); transition: width .55s var(--ease); }
 .flow-v { font-size: 13.5px; font-weight: 660; letter-spacing: -.02em; white-space: nowrap; }
 
-.month-summary { display: flex; align-items: center; gap: 16px; }
-.month-summary .flow { flex: 1; min-width: 0; }
-
 /* ═══ Ring ═════════════════════════════════════════════════════════════════ */
 .ring { position: relative; flex: none; display: grid; place-items: center; }
 .ring svg { position: absolute; inset: 0; }
@@ -676,12 +650,6 @@ button.cat:hover { background: var(--surface-2); }
   background: var(--track); margin-top: 7px; overflow: hidden;
 }
 .cat-fill { display: block; height: 100%; border-radius: var(--r-pill); transition: width .55s var(--ease); }
-.cat-tick {
-  position: absolute; top: -2px; bottom: -2px; width: 2px; border-radius: 1px;
-  background: var(--ink); opacity: .32; transform: translateX(-1px);
-}
-.cat-tick--over { background: var(--out); opacity: 1; width: 3px; }
-.cat-over { color: var(--out); font-weight: 620; }
 .cat-sub {
   display: flex; justify-content: space-between; gap: 10px;
   font-size: 11px; color: var(--ink-3); margin-top: 5px;
@@ -734,30 +702,6 @@ button.cat:hover { background: var(--surface-2); }
 }
 .wflow { display: block; font-size: 10.5px; opacity: .84; margin-top: 6px; font-weight: 550; }
 .wcard.neg .wbal { color: #ffd9cb; }
-
-/* ═══ Chips & pills ════════════════════════════════════════════════════════ */
-.chips {
-  display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none;
-  padding: 4px var(--gutter) 4px; margin: 12px calc(var(--gutter) * -1) 0;
-}
-.chips::-webkit-scrollbar { display: none; }
-.chips--tight { margin-top: 6px; }
-.sheet-body .chips { margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; }
-
-.chip {
-  padding: 8px 14px; border-radius: var(--r-pill);
-  font-size: 12.5px; font-weight: 580; white-space: nowrap; flex: none;
-  background: var(--surface); color: var(--ink-2);
-  border: 1px solid var(--line);
-  transition: background .15s var(--ease), color .15s, border-color .15s;
-}
-.chip:hover { border-color: var(--line-2); }
-.chip[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
-.chip--quiet { background: var(--surface-2); }
-.chip--in[aria-pressed="true"]   { background: var(--in);   border-color: var(--in);   color: #fff; }
-.chip--out[aria-pressed="true"]  { background: var(--out);  border-color: var(--out);  color: #fff; }
-.chip--save[aria-pressed="true"] { background: var(--save); border-color: var(--save); color: #fff; }
-.chip--flat[aria-pressed="true"] { background: var(--flat); border-color: var(--flat); color: #fff; }
 
 /* ═══ Buttons ══════════════════════════════════════════════════════════════ */
 .btn {
@@ -874,10 +818,14 @@ button.cat:hover { background: var(--surface-2); }
 .sheet-title { font-size: 19px; font-weight: 690; letter-spacing: -.03em; }
 .sheet-sub { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
 .sheet-body {
-  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain;
   padding: 0 16px 18px;
   -webkit-overflow-scrolling: touch;
 }
+/* Selects carry long option text; without this a flex row grows to fit the
+   widest one instead of ellipsising it. */
+.sheet-body select.input { max-width: 100%; }
 .sheet-body > .card:first-child { margin-top: 0; }
 .sheet-foot {
   flex: none; padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
@@ -931,8 +879,12 @@ select.input {
   background-repeat: no-repeat;
 }
 
-/* Two fields side by side: transfer's From/To, and date beside wallet. */
+/* Two fields side by side: transfer's From/To, and date beside wallet.
+   A grid item is min-content wide by default, so a select holding one long
+   option name would push its own column — and the sheet — wider than the
+   screen. `min-width: 0` lets the track win and the text ellipsise instead. */
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row-2 > * { min-width: 0; }
 .field--lead { margin-top: 16px; }
 .btn-row--form { margin-top: 20px; }
 .input--num { text-align: right; padding-left: 8px; }
@@ -1439,9 +1391,11 @@ select.input {
     grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
     gap: 0 18px; align-items: start;
   }
-  .g-tiles { grid-column: 1 / -1; }
-  .g-month, .g-cats, .g-recent { grid-column: 1; }
-  .g-wallets, .g-trend { grid-column: 2; }
+  /* Wallets and the four tiles read across the full width; below them the
+     spend breakdown and the recent list sit side by side. */
+  .g-wallets, .g-routines, .g-tiles { grid-column: 1 / -1; }
+  .g-cats { grid-column: 1; }
+  .g-recent { grid-column: 2; }
 
   .wallet-rail { flex-wrap: wrap; margin: 0; padding: 2px 0 0; }
   .wcard { width: calc(50% - 5px); }
@@ -1703,7 +1657,7 @@ select.input {
 
 /* One line per person, or per part: a name, an amount, and a way out. */
 .shares { display: grid; gap: 8px; }
-.share { display: flex; align-items: center; gap: 8px; }
+.share { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .share .icon-btn { flex: none; }
 .share .icon-btn:disabled { opacity: .25; cursor: default; }
 .share-me {
@@ -1714,14 +1668,14 @@ select.input {
   font-size: 14px; font-weight: 620; color: var(--ink-2);
 }
 .share-name { flex: 1; min-width: 0; }
-.share-reason { flex: 1.6; min-width: 0; font-size: 13px; }
+.share-reason { flex: 1; min-width: 0; font-size: 13px; }
 .share-amt {
   display: flex; align-items: center; gap: 4px; flex: none; width: 116px;
   padding: 0 12px; min-height: 46px;
   border-radius: var(--r-sm); background: var(--surface); border: 1px solid var(--line);
   transition: border-color .16s var(--ease), box-shadow .16s;
 }
-.share-amt--lead { width: 104px; }
+.share-amt--lead { width: 96px; }
 .share-amt:focus-within {
   border-color: var(--in);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--in) 16%, transparent);
@@ -1736,11 +1690,21 @@ select.input {
 .share-amt input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .share-amt input[type='number'] { -moz-appearance: textfield; }
 
-.part2 { display: grid; gap: 6px; }
-.part2-extra { font-size: 13px; margin-left: 112px; }
+/* One part of a split.
+   The extra field used to be a 100%-wide input pushed right by a 112px margin,
+   which made every part wider than the sheet holding it — that is what was
+   spilling off the right-hand edge. It sits on its own line now, indented by
+   the block rather than by the control, so it can never outgrow its container. */
+.part2 {
+  display: grid; gap: 7px;
+  padding: 10px 11px; border-radius: var(--r-sm);
+  background: var(--surface-2); border: 1px solid var(--line);
+}
+.part2 .share { gap: 7px; }
+.part2-extra { font-size: 13px; width: 100%; min-width: 0; }
 .restlink {
-  align-self: start; margin-left: 112px; padding: 1px 0;
-  font-size: 11.5px; font-weight: 600; color: var(--save);
+  justify-self: start; padding: 1px 0;
+  font-size: 11.5px; font-weight: 620; color: var(--save);
 }
 .restlink:hover { text-decoration: underline; }
 
@@ -1788,3 +1752,152 @@ select.input {
   content: ''; position: absolute; left: 2px; top: 7px;
   width: 5px; height: 5px; border-radius: 50%; background: var(--in);
 }
+
+/* ── Routines ──────────────────────────────────────────────────────────────
+   A saved entry, one tap away. On the dashboard they sit under the quick
+   actions, which is where the hand already is.                             */
+
+.routines { display: grid; gap: 8px; margin-bottom: 16px; }
+.rt-chip {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 10px 13px; text-align: left; border-radius: var(--r-md);
+  background: var(--surface); border: 1px solid var(--line);
+  box-shadow: var(--e1), var(--card-edge);
+  transition: background .16s var(--ease), border-color .16s, opacity .16s;
+}
+.rt-chip:hover { background: var(--surface-2); border-color: var(--line-2); }
+.rt-chip:active { background: var(--surface-3); }
+/* Done, not gone: still tappable, because some days you do pay twice. */
+.rt-chip--done { opacity: .58; box-shadow: none; }
+.rt-chip--done:hover { opacity: 1; }
+.rt-chip-ico {
+  width: 34px; height: 34px; border-radius: 11px; flex: none;
+  display: grid; place-items: center;
+}
+.rt-chip-ico svg { width: 16px; height: 16px; }
+.rt-chip-body { display: block; flex: 1; min-width: 0; }
+.rt-chip-n {
+  display: block; font-size: 14px; font-weight: 600; letter-spacing: -.015em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rt-chip-s { display: block; font-size: 11px; color: var(--ink-3); margin-top: 1px; }
+.rt-chip-a { font-size: 14.5px; font-weight: 660; letter-spacing: -.02em; flex: none; }
+
+/* The list of them in Settings. */
+.rt-row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 11px 0; text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+.rt-row:last-of-type { border-bottom: none; }
+.rt-row > svg { width: 15px; height: 15px; flex: none; color: var(--ink-3); }
+.rt-body { display: block; flex: 1; min-width: 0; }
+.rt-name {
+  display: block; font-size: 14px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rt-meta {
+  display: block; font-size: 11.5px; color: var(--ink-3); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rt-amt { font-size: 14px; font-weight: 640; flex: none; }
+
+/* The amount box on the routine form, filling its column. */
+.share-amt--full { width: 100%; }
+
+/* A card that is only a way through to somewhere else. */
+.card--link { display: flex; align-items: center; gap: 12px; }
+.card--link:hover { background: var(--surface-2); }
+.card--link > svg { width: 15px; height: 15px; flex: none; color: var(--ink-3); }
+.cardlink-body { display: block; flex: 1; min-width: 0; }
+.cardlink-body b { display: block; font-size: 14px; font-weight: 620; letter-spacing: -.015em; }
+.cardlink-body span { display: block; font-size: 11.5px; color: var(--ink-3); margin-top: 2px; line-height: 1.45; }
+
+/* Two lists that narrow the ledger independently — what kind of entry, and
+   which wallet paid for it. Side by side, because they are asked together. */
+.filters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.filters .field { margin-bottom: 0; }
+.filters select.input { font-size: 13.5px; }
+
+/* The one-tap rail carries a section label like the wallets above it. */
+.g-routines .section-label { margin-bottom: 8px; }
+
+/* A confirm that will destroy something says so in the button, not only in the
+   words above it — the same panel as every other question, in the other colour. */
+.btn--danger-solid {
+  background: var(--danger); border-color: var(--danger); color: #fff;
+  box-shadow: none;
+}
+.btn--danger-solid:hover { background: color-mix(in oklab, var(--danger) 88%, #000); border-color: transparent; }
+.alert-ico.tone-danger {
+  background: color-mix(in oklab, var(--danger) var(--tint), var(--surface));
+  color: var(--danger);
+}
+
+/* ── Types of entry ────────────────────────────────────────────────────────
+   Grouped pills that wrap. The scrolling row this replaced hid most of them off
+   the side; the grid that replaced that turned a choice into a wall of boxes.
+   A pill is the lightest thing that can still be tapped and still say which one
+   is chosen — and grouping means you can find a kind by what it is about.    */
+.kindpick { display: grid; gap: 11px; margin-bottom: 18px; }
+.kindgroup-l {
+  display: block; font-size: 10px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px;
+}
+.kindrow { display: flex; flex-wrap: wrap; gap: 6px; }
+.kpill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 13px 8px 11px; border-radius: var(--r-pill);
+  font-size: 12.5px; font-weight: 570; letter-spacing: -.01em;
+  background: var(--surface); color: var(--ink-2);
+  border: 1px solid var(--line);
+  transition: background .15s var(--ease), color .15s, border-color .15s;
+}
+.kpill svg { width: 14px; height: 14px; opacity: .6; }
+.kpill:hover { border-color: var(--line-2); background: var(--surface-2); }
+.kpill[aria-checked='true'] { font-weight: 640; color: #fff; }
+.kpill[aria-checked='true'] svg { opacity: 1; }
+.kpill--out[aria-checked='true']  { background: var(--out);  border-color: var(--out); }
+.kpill--in[aria-checked='true']   { background: var(--in);   border-color: var(--in); }
+.kpill--save[aria-checked='true'] { background: var(--save); border-color: var(--save); }
+.kpill--flat[aria-checked='true'] { background: var(--ink);  border-color: var(--ink); color: var(--surface); }
+
+/* ── Updating ──────────────────────────────────────────────────────────────
+   A new version is about to be swapped in. Brief and unmissable, so the reload
+   that follows reads as the app doing something rather than as a glitch.     */
+.updating {
+  position: fixed; z-index: 80; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 9px;
+  padding: 11px 16px; border-radius: var(--r-pill);
+  background: var(--ink); color: var(--canvas);
+  font-size: 12.5px; font-weight: 600; white-space: nowrap;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .28);
+  animation: pop .26s var(--spring);
+}
+.updating-ico { display: grid; place-items: center; }
+.updating-ico svg { width: 15px; height: 15px; animation: spin 1.1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── What's new ────────────────────────────────────────────────────────────
+   Read once, after the update it describes has already been installed.       */
+.release + .release { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); }
+.release-head { margin-bottom: 12px; }
+.release-v {
+  display: inline-block; margin-bottom: 6px; padding: 2px 9px;
+  border-radius: var(--r-pill); font-size: 10.5px; font-weight: 700; letter-spacing: .02em;
+  background: color-mix(in oklab, var(--in) var(--tint), var(--surface)); color: var(--in);
+}
+.release-t { font-size: 16px; font-weight: 680; letter-spacing: -.02em; line-height: 1.3; }
+.release-list { display: grid; gap: 11px; }
+.release-list li {
+  list-style: none; display: flex; gap: 10px;
+  font-size: 13px; line-height: 1.55; color: var(--ink-2);
+}
+.release-tick {
+  width: 19px; height: 19px; border-radius: 50%; flex: none; margin-top: 1px;
+  display: grid; place-items: center;
+  background: color-mix(in oklab, var(--in) var(--tint), var(--surface));
+  color: var(--in);
+}
+.release-tick svg { width: 11px; height: 11px; }

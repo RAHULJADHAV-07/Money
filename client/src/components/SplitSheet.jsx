@@ -38,6 +38,36 @@ const blankFlow = (direction, method) => ({
   ],
 });
 
+/* Which plain reason a kind you were already typing corresponds to, so arriving
+   here from the add sheet lands on the row you meant rather than a blank one. */
+const REASON_FOR = {
+  repay_received: ['in', 'repaid'],
+  income:         ['in', 'gift'],
+  borrowed:       ['in', 'toreturn'],
+  saving_out:     ['in', 'unsaved'],
+  expense:        ['out', 'bought'],
+  repay_paid:     ['out', 'repaying'],
+  lent:           ['out', 'lending'],
+  saving_in:      ['out', 'saved'],
+};
+
+/* Everything already typed on the add sheet, carried across: the amount, who it
+   was with, the wallet, and the first part filled in as the thing you had said
+   it was. All that is left is to say what the rest of it was. */
+function fromEntry(from, fallbackMethod) {
+  const [direction, reason] = REASON_FOR[from.kind] || ['in', 'repaid'];
+  const f = blankFlow(direction, from.method || fallbackMethod);
+  f.amount = from.amount > 0 ? String(from.amount) : '';
+  f.person = from.person || '';
+  f.rows[0] = {
+    ...f.rows[0], reason,
+    category: from.category || '', source: from.source || '', goal: from.goal || '',
+  };
+  const second = REASONS[direction].find((r) => r.id !== reason);
+  f.rows[1] = { ...f.rows[1], reason: second.id };
+  return f;
+}
+
 const SHAPES = [
   { id: 'bill', title: 'We shared a bill', hint: 'One cost, split between people', icon: <IconSplit /> },
   { id: 'in',   title: 'Money came to me', hint: 'Part of it was one thing, part another', icon: <span className="shape-sign">+</span> },
@@ -52,7 +82,8 @@ export default function SplitSheet() {
   const categories = settings?.categories || [];
   const sources = settings?.sources || [];
 
-  const [form, setForm] = useState(null);
+  const [form, setForm] = useState(() =>
+    splitSheet?.from?.kind ? fromEntry(splitSheet.from, settings?.methods?.[0] || 'Cash') : null);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(todayKey);
   const [goals, setGoals] = useState([]);
@@ -62,6 +93,7 @@ export default function SplitSheet() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [alert, setAlert] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const tailRef = useRef(null);
 
   const money = (n) => fmt(n, currency);
@@ -181,7 +213,6 @@ export default function SplitSheet() {
   }
 
   async function remove() {
-    if (!confirm('Delete this split and everything it recorded?')) return;
     setSaving(true);
     try {
       await api.deleteGroup(groupId);
@@ -247,6 +278,10 @@ export default function SplitSheet() {
 
       {!groupId && (
         <button type="button" className="backlink" onClick={() => setForm(null)}>&larr; Something else happened</button>
+      )}
+
+      {splitSheet?.from?.kind && (
+        <p className="field-hint">Carried over from the entry you were adding — change anything that is not right.</p>
       )}
 
       {isBill ? (
@@ -420,12 +455,6 @@ export default function SplitSheet() {
                       </button>
                     </div>
 
-                    {canFill && (
-                      <button type="button" className="restlink" onClick={() => patchRow(r.key, { amount: String(left) })}>
-                        use the remaining {money(left)}
-                      </button>
-                    )}
-
                     {reason.needs === 'category' && (
                       <select className="input part2-extra" aria-label="Category"
                               value={r.category || categories[0] || ''} onChange={(e) => patchRow(r.key, { category: e.target.value })}>
@@ -444,6 +473,12 @@ export default function SplitSheet() {
                         <option value="">General savings</option>
                         {goals.map((g) => <option key={g._id} value={g._id}>{g.name}</option>)}
                       </select>
+                    )}
+
+                    {canFill && (
+                      <button type="button" className="restlink" onClick={() => patchRow(r.key, { amount: String(left) })}>
+                        Use the remaining {money(left)}
+                      </button>
                     )}
                   </div>
                 );
@@ -502,7 +537,7 @@ export default function SplitSheet() {
 
       <div className="btn-row btn-row--form">
         {groupId && (
-          <button className="btn btn--danger btn--icon" onClick={remove} disabled={saving} aria-label="Delete split">
+          <button className="btn btn--danger btn--icon" onClick={() => setConfirmDelete(true)} disabled={saving} aria-label="Delete split">
             <IconTrash />
           </button>
         )}
@@ -510,6 +545,17 @@ export default function SplitSheet() {
           {saving ? 'Saving…' : groupId ? 'Save changes' : 'Save'}
         </button>
       </div>
+
+      {confirmDelete && (
+        <Alert
+          danger tone="danger"
+          title="Delete this split?"
+          message={`Every entry it recorded goes with it — ${derived.parts.length} in all. This cannot be undone.`}
+          action="Delete it all" cancel="Keep it"
+          onConfirm={() => { setConfirmDelete(false); remove(); }}
+          onClose={() => setConfirmDelete(false)}
+        />
+      )}
 
       {alert && <Alert title={alert.title} message={alert.message} onClose={() => setAlert(null)} />}
     </Sheet>

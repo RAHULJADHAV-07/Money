@@ -1,22 +1,31 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useApi, useStore } from '../lib/store.jsx';
-import {
-  moneyRound, money, moneyParts, compact, todayKey, monthLabel, monthShort, monthProgress,
-} from '../lib/format.js';
+import { moneyRound, money, moneyParts, compact, todayKey, monthShort } from '../lib/format.js';
 import TxList from '../components/TxList.jsx';
-import { CategoryBars, TrendChart, FlowBar, Ring } from '../components/Charts.jsx';
+import Alert from '../components/Alert.jsx';
+import { CategoryBars } from '../components/Charts.jsx';
 import { walletHue } from '../lib/palette.js';
+import { KINDS } from '../lib/kinds.js';
 import {
-  IconArrowUpRight, IconChevronRight, IconChevronDown, IconSpark, IconWallet,
-  IconSavings, IconIncoming, IconOutgoing, IconDebt, IconSwap, KindIcon,
+  IconArrowUpRight, IconChevronRight, IconChevronDown, IconWallet, IconCheck,
+  IconSavings, IconIncoming, IconOutgoing, KindIcon,
 } from '../components/Icons.jsx';
 
+const DONE_LABEL = {
+  daily: 'Done today', weekly: 'Done this week',
+  monthly: 'Done this month', yearly: 'Done this year',
+};
+
+/* The four entries worth reaching for without thinking. Lending and borrowing
+   sit beside spending and receiving because they are just as common here, and
+   each carries the direction its money actually goes. */
 const QUICK_ACTIONS = [
-  { kind: 'expense', label: 'Spent',    tone: 'out',  icon: <KindIcon kind="expense" /> },
-  { kind: 'income',  label: 'Received', tone: 'in',   icon: <KindIcon kind="income" /> },
-  { kind: 'lent',    label: 'Lent',     tone: 'flat', icon: <IconDebt /> },
-  { kind: 'transfer', label: 'Move',    tone: 'flat', icon: <IconSwap /> },
+  { kind: 'expense',  label: 'Spent',    tone: 'out' },
+  { kind: 'income',   label: 'Received', tone: 'in'  },
+  { kind: 'lent',     label: 'Lent',     tone: 'out' },
+  { kind: 'borrowed', label: 'Borrowed', tone: 'in'  },
 ];
 
 function HeroAmount({ value, currency }) {
@@ -36,6 +45,7 @@ function Skeleton() {
     <div className="page">
       <div className="skel" style={{ height: 186, borderRadius: 26, marginTop: 14 }} />
       <div className="skel" style={{ height: 74, marginTop: 14 }} />
+      <div className="skel" style={{ height: 104, marginTop: 14 }} />
       <div className="tiles" style={{ marginTop: 14 }}>
         {[0, 1, 2, 3].map((i) => <div key={i} className="skel" style={{ height: 92 }} />)}
       </div>
@@ -45,11 +55,34 @@ function Skeleton() {
 }
 
 export default function Home() {
-  const { month, currency, openAdd, settings, openMonthSheet } = useStore();
+  const { month, currency, openAdd, settings, openMonthSheet, refresh, notify, apiBehind } = useStore();
   const navigate = useNavigate();
   const catOrder = settings?.categories || [];
   const walletOrder = settings?.methods || [];
   const { data, loading, error } = useApi(() => api.summary(month, todayKey()), [month]);
+  const routines = useApi(() => api.routines(todayKey()), []).data?.items || [];
+  const [ask, setAsk] = useState(null);      // the routine awaiting a yes
+  const [alert, setAlert] = useState(null);
+  const [running, setRunning] = useState(false);
+
+  /* Nothing is written until you say yes, and the confirmation names the amount
+     and where it lands -- a one-tap button is only safe if it cannot be tapped
+     by accident. A routine already done stays tappable, and says so instead. */
+  async function run(routine) {
+    setRunning(true);
+    try {
+      await api.runRoutine(routine._id);
+      setAsk(null);
+      notify(`${routine.label} added`);
+      refresh();
+    } catch (err) {
+      setAsk(null);
+      setAlert({
+        title: err.code === 'INSUFFICIENT_FUNDS' ? 'Not enough in that wallet' : 'Could not add it',
+        message: err.message,
+      });
+    } finally { setRunning(false); }
+  }
 
   if (error) {
     return (
@@ -61,14 +94,9 @@ export default function Home() {
 
   if (loading && !data) return <Skeleton />;
 
-  const { cards, today, monthly, byCategory, trend, recent, wallets = [] } = data;
+  const { cards, today, byCategory, recent, wallets = [] } = data;
   const activeWallets = wallets.filter((w) => w.balance !== 0 || w.in !== 0 || w.out !== 0);
   const noData = !recent.length;
-
-  const { elapsed, total, current } = monthProgress(month);
-  const pace = elapsed > 0 ? monthly.expense / elapsed : 0;
-  const projected = pace * total;
-  const topCat = byCategory[0];
 
   return (
     <>
@@ -81,7 +109,6 @@ export default function Home() {
         </div>
 
         <HeroAmount value={cards.balance} currency={currency} />
-
 
         <div className="hero-foot">
           <div className="hero-stat">
@@ -99,84 +126,13 @@ export default function Home() {
         <div className="qa">
           {QUICK_ACTIONS.map((a) => (
             <button key={a.kind} className="qa-item" onClick={() => openAdd({ kind: a.kind })}>
-              <span className={`qa-ico tone-${a.tone}`}>{a.icon}</span>
+              <span className={`qa-ico tone-${a.tone}`}><KindIcon kind={a.kind} /></span>
               <span className="qa-label">{a.label}</span>
             </button>
           ))}
         </div>
 
         <div className="home-grid">
-          <div className="tiles g-tiles">
-            <button className="tile" onClick={() => navigate('/people')}>
-              <span className="tile-ico tone-in"><IconIncoming /></span>
-              <span className="tile-k">To receive</span>
-              <span className="tile-v num tone-text-in">{moneyRound(cards.toReceive, currency)}</span>
-              <span className="tile-note">money you lent out</span>
-            </button>
-            <button className="tile" onClick={() => navigate('/people')}>
-              <span className="tile-ico tone-out"><IconOutgoing /></span>
-              <span className="tile-k">To pay back</span>
-              <span className="tile-v num tone-text-out">{moneyRound(cards.toPay, currency)}</span>
-              <span className="tile-note">money you borrowed</span>
-            </button>
-            <button className="tile" onClick={() => navigate('/savings')}>
-              <span className="tile-ico tone-save"><IconSavings /></span>
-              <span className="tile-k">Savings</span>
-              <span className="tile-v num tone-text-save">{moneyRound(cards.savings, currency)}</span>
-              <span className="tile-note">set aside so far</span>
-            </button>
-            <button className="tile" onClick={() => navigate('/ledger')}>
-              <span className="tile-ico tone-flat"><IconWallet /></span>
-              <span className="tile-k">Net worth</span>
-              <span className="tile-v num">{moneyRound(cards.netWorth, currency)}</span>
-              <span className="tile-note">wallets, savings, dues</span>
-            </button>
-          </div>
-
-          <div className="card g-month">
-            <div className="card-head">
-              <h2 className="card-title">{monthLabel(month)}</h2>
-              <button className="card-action" onClick={openMonthSheet}>Change<IconChevronRight /></button>
-            </div>
-
-            <div className="month-summary">
-              <FlowBar inAmount={monthly.received} outAmount={monthly.expense} />
-              {monthly.income > 0 && (
-                <Ring
-                  value={Math.max(0, Math.min(1, monthly.savingsRate))}
-                  label={`${Math.round(monthly.savingsRate * 100)}%`}
-                  sub="kept"
-                  color={monthly.savingsRate >= 0 ? 'var(--in)' : 'var(--out)'}
-                />
-              )}
-            </div>
-
-            <div className="strip strip--total">
-              <span className="k">Left over</span>
-              <span className={`v num ${monthly.net >= 0 ? 'tone-text-in' : 'tone-text-out'}`}>
-                {money(monthly.net, currency)}
-              </span>
-            </div>
-
-            {current && monthly.expense > 0 && (
-              <div className="insight">
-                <span className="insight-ico"><IconSpark /></span>
-                <span>
-                  About <strong className="num">{money(Math.round(pace), currency)}</strong> a day so far.
-                  Keep this up and {monthShort(month)} lands near <strong className="num">{money(Math.round(projected), currency)}</strong>.
-                </span>
-              </div>
-            )}
-            {!current && topCat && (
-              <div className="insight">
-                <span className="insight-ico"><IconSpark /></span>
-                <span>
-                  <strong>{topCat.name}</strong> took the largest share — {Math.round(topCat.share * 100)}% of everything spent.
-                </span>
-              </div>
-            )}
-          </div>
-
           {activeWallets.length > 0 && (
             <section className="g-wallets">
               <div className="section-label">Where your money sits</div>
@@ -205,6 +161,55 @@ export default function Home() {
             </section>
           )}
 
+          {routines.length > 0 && !apiBehind && (
+            <section className="routines g-routines">
+              <div className="section-label">One tap</div>
+              {routines.map((r) => (
+                <button
+                  key={r._id}
+                  className={`rt-chip${r.due ? '' : ' rt-chip--done'}`}
+                  onClick={() => setAsk(r)}
+                >
+                  <span className={`rt-chip-ico tone-${KINDS[r.kind]?.tone || 'out'}`}>
+                    {r.due ? <KindIcon kind={r.kind} /> : <IconCheck />}
+                  </span>
+                  <span className="rt-chip-body">
+                    <span className="rt-chip-n">{r.label}</span>
+                    <span className="rt-chip-s">{r.due ? KINDS[r.kind]?.short : (DONE_LABEL[r.cadence] || 'Done')}</span>
+                  </span>
+                  <span className="rt-chip-a num">{money(r.amount, currency)}</span>
+                </button>
+              ))}
+            </section>
+          )}
+
+          <div className="tiles g-tiles">
+            <button className="tile" onClick={() => navigate('/people')}>
+              <span className="tile-ico tone-in"><IconIncoming /></span>
+              <span className="tile-k">To receive</span>
+              <span className="tile-v num tone-text-in">{moneyRound(cards.toReceive, currency)}</span>
+              <span className="tile-note">money you lent out</span>
+            </button>
+            <button className="tile" onClick={() => navigate('/people')}>
+              <span className="tile-ico tone-out"><IconOutgoing /></span>
+              <span className="tile-k">To pay back</span>
+              <span className="tile-v num tone-text-out">{moneyRound(cards.toPay, currency)}</span>
+              <span className="tile-note">money you borrowed</span>
+            </button>
+            <button className="tile" onClick={() => navigate('/savings')}>
+              <span className="tile-ico tone-save"><IconSavings /></span>
+              <span className="tile-k">Savings</span>
+              <span className="tile-v num tone-text-save">{moneyRound(cards.savings, currency)}</span>
+              <span className="tile-note">set aside so far</span>
+            </button>
+            <button className="tile" onClick={() => navigate('/ledger')}>
+              <span className="tile-ico tone-flat"><IconWallet /></span>
+              <span className="tile-k">Net worth</span>
+              <span className="tile-v num">{moneyRound(cards.netWorth, currency)}</span>
+              <span className="tile-note">wallets, savings, dues</span>
+            </button>
+          </div>
+
           {byCategory.length > 0 && (
             <div className="card g-cats">
               <div className="card-head">
@@ -212,13 +217,6 @@ export default function Home() {
                 <Link className="card-action" to="/ledger">See all<IconChevronRight /></Link>
               </div>
               <CategoryBars rows={byCategory.slice(0, 6)} order={catOrder} />
-            </div>
-          )}
-
-          {trend.some((t) => t.income || t.expense) && (
-            <div className="card g-trend">
-              <div className="card-head"><h2 className="card-title">In and out</h2></div>
-              <TrendChart data={trend} />
             </div>
           )}
 
@@ -242,6 +240,32 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {ask && (
+        <Alert
+          tone="in"
+          title={ask.due ? `Add ${ask.label}?` : `${ask.label} is already done`}
+          message={
+            `${money(ask.amount, currency)} — ${describeRoutine(ask)}, from ${ask.method}, dated today.` +
+            (ask.due ? '' : ` You last did this on ${String(ask.lastDone).slice(0, 10)}. Add it again?`)
+          }
+          action={running ? 'Adding…' : 'Yes, add it'}
+          cancel="Not now"
+          onConfirm={() => !running && run(ask)}
+          onClose={() => !running && setAsk(null)}
+        />
+      )}
+
+      {alert && <Alert title={alert.title} message={alert.message} onClose={() => setAlert(null)} />}
     </>
   );
+}
+
+// What the entry will say, in the confirmation, before it exists.
+function describeRoutine(r) {
+  if (r.goal) return `into ${r.goal.name || 'general savings'}`;
+  if (r.category) return `spent on ${r.category}`;
+  if (r.source) return `received from ${r.source}`;
+  if (r.person) return `with ${r.person}`;
+  return KINDS[r.kind]?.label?.toLowerCase() || 'entry';
 }

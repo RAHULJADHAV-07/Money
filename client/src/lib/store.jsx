@@ -1,6 +1,7 @@
 import { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, flushOutbox, onOutboxChange, pendingCount } from './api.js';
+import { api, health, flushOutbox, onOutboxChange, pendingCount } from './api.js';
 import { monthKeyNow } from './format.js';
+import { isNewer } from './version.js';
 
 const Ctx = createContext(null);
 export const useStore = () => useContext(Ctx);
@@ -16,6 +17,13 @@ export function StoreProvider({ children }) {
   const [splitSheet, setSplitSheet] = useState(null);  // { groupId } | {} for a new split
   const [monthSheet, setMonthSheet] = useState(false);
   const [day, setDay] = useState(null);                // 'YYYY-MM-DD' when one day is picked
+  /* The ledger opens on everything you have ever logged; a month is something
+     you ask for. The dashboard is month-shaped by nature and ignores this. */
+  const [allTime, setAllTime] = useState(true);
+  /* True while the API is running an older release than this app. The two
+     deploy separately, so there is a window after every push where the new
+     screens would be calling endpoints that do not exist yet. */
+  const [apiBehind, setApiBehind] = useState(false);
   const toastTimer = useRef();
 
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
@@ -31,6 +39,32 @@ export function StoreProvider({ children }) {
   }, [version]);
 
   useEffect(() => onOutboxChange(setPending), []);
+
+  /* Asked once on load, then every half minute only while it is behind — so a
+     deploy still in flight resolves itself without anyone reloading, and a
+     healthy pair costs exactly one request. */
+  useEffect(() => {
+    let alive = true;
+    let timer;
+    const ask = async () => {
+      try {
+        const h = await health();
+        if (!alive) return;
+        /* An API that answers but names no version predates the field itself,
+           which every release from 2.0.0 on carries — so it is older than this
+           app by definition. That is the case during the very deploy this is
+           meant to cover, and the one an equality check would miss. */
+        const behind = h?.ok === true && (!h.version || isNewer(__APP_VERSION__, h.version));
+        setApiBehind(behind);
+        if (behind) timer = setTimeout(ask, 30_000);
+      } catch {
+        // Offline, or the API is asleep. Neither means it is out of date.
+        if (alive) setApiBehind(false);
+      }
+    };
+    ask();
+    return () => { alive = false; clearTimeout(timer); };
+  }, []);
 
   useEffect(() => {
     const sync = async () => {
@@ -60,23 +94,29 @@ export function StoreProvider({ children }) {
     };
   }, [notify, refresh]);
 
-  // Changing month by any route clears a day filter belonging to the old month.
+  /* Changing month by any route clears a day filter belonging to the old month,
+     and means you are asking for that month rather than for everything. */
   const changeMonth = useCallback((m) => {
     setMonth(m);
+    setAllTime(false);
     setDay((d) => (d && d.slice(0, 7) === m ? d : null));
   }, []);
+
+  const showAllTime = useCallback(() => { setAllTime(true); setDay(null); }, []);
 
   const value = useMemo(() => ({
     settings, month, setMonth: changeMonth, version, refresh,
     day, setDay,
+    allTime, showAllTime,
     monthSheet, openMonthSheet: () => setMonthSheet(true), closeMonthSheet: () => setMonthSheet(false),
-    online, pending, toast, notify,
+    online, pending, toast, notify, apiBehind,
     addSheet, openAdd: (opts = {}) => setAddSheet(opts), closeAdd: () => setAddSheet(null),
     splitSheet,
     openSplit: (opts = {}) => { setAddSheet(null); setSplitSheet(opts); },
     closeSplit: () => setSplitSheet(null),
     currency: settings?.currency || '₹',
-  }), [settings, month, changeMonth, day, monthSheet, version, online, pending, toast, notify, addSheet, splitSheet, refresh]);
+  }), [settings, month, changeMonth, day, allTime, showAllTime, monthSheet, version, online,
+       pending, toast, notify, apiBehind, addSheet, splitSheet, refresh]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

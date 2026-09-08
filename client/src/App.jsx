@@ -11,6 +11,8 @@ import {
 } from './components/Icons.jsx';
 import AddSheet from './components/AddSheet.jsx';
 import SplitSheet from './components/SplitSheet.jsx';
+import UpdateGate from './components/UpdateGate.jsx';
+import WhatsNew from './components/WhatsNew.jsx';
 import MonthSheet from './components/MonthSheet.jsx';
 import Home from './pages/Home.jsx';
 import Transactions from './pages/Transactions.jsx';
@@ -31,15 +33,20 @@ const TITLES = {
 // Only these two screens are scoped to a month, so only these two get the stepper.
 const MONTH_ROUTES = ['/', '/ledger'];
 
-function MonthPill() {
-  const { month, setMonth, openMonthSheet, day } = useStore();
+/* `scoped` is the ledger, which can be showing everything rather than a month —
+   the pill has to say so, or the arrows would look like they did nothing. */
+function MonthPill({ scoped = false }) {
+  const { month, setMonth, openMonthSheet, day, allTime } = useStore();
   const atNow = month >= monthKeyNow();
+  const showingAll = scoped && allTime && !day;
 
   return (
     <div className="monthpill">
       <button onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Previous month"><IconChevronLeft /></button>
       <button className="monthpill-label" onClick={openMonthSheet} aria-label="Open calendar">
-        {day ? (
+        {showingAll ? (
+          <span className="monthpill-full">All time</span>
+        ) : day ? (
           <span className="monthpill-full">{dayLabel(day)}</span>
         ) : (
           <>
@@ -48,7 +55,9 @@ function MonthPill() {
           </>
         )}
       </button>
-      <button onClick={() => setMonth(shiftMonth(month, 1))} disabled={atNow} aria-label="Next month"><IconChevronRight /></button>
+      <button onClick={() => setMonth(shiftMonth(month, 1))} disabled={!showingAll && atNow} aria-label="Next month">
+        <IconChevronRight />
+      </button>
     </div>
   );
 }
@@ -72,7 +81,7 @@ function ThemeButton() {
 
 function TopBar() {
   const { pathname } = useLocation();
-  const { online, pending } = useStore();
+  const { online, pending, apiBehind } = useStore();
   const [title, sub] = TITLES[pathname] || TITLES['/'];
 
   return (
@@ -84,7 +93,7 @@ function TopBar() {
             <p className="topbar-sub">{sub}</p>
           </div>
           <div className="topbar-actions">
-            {MONTH_ROUTES.includes(pathname) && <MonthPill />}
+            {MONTH_ROUTES.includes(pathname) && <MonthPill scoped={pathname === '/ledger'} />}
             <ThemeButton />
           </div>
         </div>
@@ -100,6 +109,15 @@ function TopBar() {
         <div className="banner">
           <IconSync />
           <span>Syncing {pending} saved {pending === 1 ? 'entry' : 'entries'}…</span>
+        </div>
+      )}
+      {/* Said once, at the top, rather than as a failure inside whichever new
+          screen you happened to open first. It clears itself when the API
+          catches up — no reload needed. */}
+      {apiBehind && (
+        <div className="banner banner--warn">
+          <IconSync />
+          <span>Finishing the update — splits and routines are back in a moment. Everything else works.</span>
         </div>
       )}
     </>
@@ -211,6 +229,9 @@ function Shell() {
         <span className="fab-label">Add</span>
       </button>
       <Nav />
+
+      <UpdateGate />
+      <WhatsNew />
 
       {addSheet && <AddSheet key={addSheet.tx?._id || addSheet.kind || 'new'} />}
       {splitSheet && <SplitSheet key={splitSheet.groupId || 'new-split'} />}

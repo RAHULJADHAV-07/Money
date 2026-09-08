@@ -136,3 +136,31 @@ alter table tx_groups add column if not exists form jsonb not null default '{}':
 
 create index if not exists tx_groups_user_idx on tx_groups (user_id, date desc);
 create index if not exists tx_group_idx       on transactions (group_id);
+
+/* ── Routines ──────────────────────────────────────────────────────────────
+   An entry you make over and over -- a hundred rupees into the jar, every day.
+   The routine is only a saved shape; nothing posts on its own. You tap it, you
+   confirm, and an ordinary entry is written. `last_done` is the day you last
+   tapped it, which is what decides whether it still needs doing today.        */
+create table if not exists routines (
+  id         text primary key default gen_random_uuid()::text,
+  user_id    text not null references users(id) on delete cascade,
+  label      text not null default '',
+  kind       text not null,
+  amount     double precision not null check (amount > 0),
+  category   text not null default '',
+  source     text not null default '',
+  person     text not null default '',
+  goal_id    text references goals(id) on delete set null,
+  note       text not null default '',
+  method     text not null default 'Cash',
+  to_method  text not null default '',
+  -- daily | weekly | monthly | yearly | anytime
+  cadence    text not null default 'daily',
+  last_done  date,
+  archived   boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists routines_user_idx on routines (user_id, archived, created_at);

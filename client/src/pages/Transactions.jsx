@@ -5,30 +5,33 @@ import { money, monthLabel, dayLabel, fullDayLabel } from '../lib/format.js';
 import { IconSearch, IconClose, IconChevronRight, IconInbox } from '../components/Icons.jsx';
 import { FlowBar } from '../components/Charts.jsx';
 import TxList from '../components/TxList.jsx';
+import { KINDS } from '../lib/kinds.js';
 
-const FILTERS = [
-  { id: 'all', label: 'All', kinds: '' },
-  { id: 'out', label: 'Spent', kinds: 'expense' },
-  { id: 'in', label: 'Received', kinds: 'income,repay_received' },
-  { id: 'debt', label: 'Borrow / Lend', kinds: 'lent,borrowed,repay_paid,repay_received' },
-  { id: 'save', label: 'Savings', kinds: 'saving_in,saving_out' },
-  { id: 'move', label: 'Transfers', kinds: 'transfer' },
+/* Every kind, not a handful of bundles. The old chips grouped them — "Borrow /
+   Lend" meant four kinds at once — which made it impossible to ask for just the
+   money you borrowed. One kind per option answers the question you actually
+   have; the two lists narrow independently. */
+const TYPES = [
+  'expense', 'income', 'lent', 'borrowed', 'repay_received', 'repay_paid',
+  'transfer', 'saving_in', 'saving_out', 'settle_received', 'settle_paid', 'pass_through',
 ];
 
 export default function Transactions() {
-  const { month, currency, openAdd, openMonthSheet, day, setDay } = useStore();
-  const [filter, setFilter] = useState('all');
+  const { month, currency, openAdd, openMonthSheet, day, settings, allTime, showAllTime } = useStore();
+  const [kind, setKind] = useState('');
+  const [method, setMethod] = useState('');
   const [q, setQ] = useState('');
 
-  const active = FILTERS.find((f) => f.id === filter);
+  const wallets = settings?.methods?.length ? settings.methods : ['Cash', 'UPI', 'Bank', 'Card'];
   const { data, loading } = useApi(
     () => api.transactions({
       limit: 300,
-      ...(day ? { from: day, to: day } : { month }),
-      ...(active.kinds && { kinds: active.kinds }),
+      ...(day ? { from: day, to: day } : allTime ? {} : { month }),
+      ...(kind && { kind }),
+      ...(method && { method }),
       ...(q && { q }),
     }),
-    [month, day, filter, q]
+    [month, day, allTime, kind, method, q]
   );
 
   /* Entries saved while offline aren't on the server yet — show them inline. A
@@ -42,30 +45,37 @@ export default function Transactions() {
       return w.body.parts.map((p, i) => ({
         ...p, _id: `${w.id}-${i}`, date: w.body.date, queued: true, goal: null, group,
       }));
-    });
+    })
+    // The server applies the filters to everything else; these never reached it.
+    .filter((t) => (!kind || t.kind === kind) && (!method || t.method === method || t.toMethod === method));
 
   const items = [...queued, ...(data?.items || [])];
   const spent = items.filter((t) => t.kind === 'expense').reduce((n, t) => n + t.amount, 0);
   const got = items.filter((t) => t.kind === 'income' || t.kind === 'repay_received').reduce((n, t) => n + t.amount, 0);
-  const filtered = filter !== 'all' || !!q;
+  const filtered = !!kind || !!method || !!q || !!day || !allTime;
 
   return (
     <div className="page">
       <div className="card">
         <div className="card-head">
           <div>
-            <h2 className="card-title">{day ? fullDayLabel(day) : monthLabel(month)}</h2>
+            <h2 className="card-title">{day ? fullDayLabel(day) : allTime ? 'All time' : monthLabel(month)}</h2>
             <p className="card-sub">
-              {items.length} {items.length === 1 ? 'entry' : 'entries'}{filtered ? ' matching' : ''}
+              {data?.total ?? items.length} {(data?.total ?? items.length) === 1 ? 'entry' : 'entries'}
+              {filtered ? ' matching' : ''}
+              {data?.hasMore ? ` · showing the latest ${items.length}` : ''}
             </p>
           </div>
-          <button className="card-action" onClick={openMonthSheet}>Change<IconChevronRight /></button>
+          <button className="card-action" onClick={openMonthSheet}>
+            {allTime && !day ? 'Pick a month' : 'Change'}<IconChevronRight />
+          </button>
         </div>
 
-        {day && (
-          <button className="daybar" onClick={() => setDay(null)}>
-            <span>Showing one day</span>
-            <span className="daybar-a">See all of {monthLabel(month)}</span>
+        {/* One way back out, whichever way you narrowed it. */}
+        {(day || !allTime) && (
+          <button className="daybar" onClick={showAllTime}>
+            <span>{day ? `Showing ${fullDayLabel(day)}` : `Showing ${monthLabel(month)}`}</span>
+            <span className="daybar-a">See all time</span>
           </button>
         )}
 
@@ -86,12 +96,21 @@ export default function Transactions() {
         )}
       </div>
 
-      <div className="chips">
-        {FILTERS.map((f) => (
-          <button key={f.id} className="chip" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
-            {f.label}
-          </button>
-        ))}
+      <div className="filters">
+        <div className="field">
+          <label className="field-label" htmlFor="f-kind">Type of entry</label>
+          <select id="f-kind" className="input" value={kind} onChange={(e) => setKind(e.target.value)}>
+            <option value="">All types</option>
+            {TYPES.map((k) => <option key={k} value={k}>{KINDS[k].label}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label className="field-label" htmlFor="f-method">Paid with</label>
+          <select id="f-method" className="input" value={method} onChange={(e) => setMethod(e.target.value)}>
+            <option value="">All wallets</option>
+            {wallets.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
       </div>
 
 
@@ -117,10 +136,13 @@ export default function Transactions() {
           <div className="empty-s">
             {q
               ? `No entry matches “${q}”.`
-              : `No ${active.label.toLowerCase()} entries ${day ? `on ${dayLabel(day)}` : `in ${monthLabel(month)}`}.`}
+              : `No ${kind ? `${KINDS[kind].label.toLowerCase()} ` : ''}entries` +
+                `${method ? ` in ${method}` : ''}` +
+                `${day ? ` on ${dayLabel(day)}` : allTime ? ' yet' : ` in ${monthLabel(month)}`}.`}
           </div>
           {filtered ? (
-            <button className="btn" style={{ marginTop: 16 }} onClick={() => { setQ(''); setFilter('all'); }}>
+            <button className="btn" style={{ marginTop: 16 }}
+                    onClick={() => { setQ(''); setKind(''); setMethod(''); showAllTime(); }}>
               Clear filters
             </button>
           ) : (

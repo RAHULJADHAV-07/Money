@@ -11,7 +11,14 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      /* `prompt` rather than `autoUpdate`: the app still updates itself without
+         being asked, but on its own terms. autoUpdate reloads the moment a new
+         worker activates, which can land in the middle of a half-typed entry.
+         See lib/update.js — it waits for a moment when nothing is open. */
+      registerType: 'prompt',
+      // Registered from lib/update.js instead, so the polling and the reload
+      // are in one place rather than split with an injected script.
+      injectRegister: null,
       includeAssets: ['favicon.png', 'apple-touch-icon.png'],
       manifest: {
         id: '/',

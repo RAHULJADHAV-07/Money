@@ -1,14 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, getToken } from '../lib/api.js';
-import { useStore } from '../lib/store.jsx';
+import { useApi, useStore } from '../lib/store.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { useTheme, THEMES } from '../lib/theme.js';
 import { money } from '../lib/format.js';
+import { KINDS } from '../lib/kinds.js';
 import {
   IconSun, IconMoon, IconAuto, IconDownload, IconLogout, IconClose, IconPlus,
-  IconWallet, IconTag, IconTarget, IconUser, IconInfo,
+  IconWallet, IconTag, IconTarget, IconUser, IconInfo, IconSavings, IconChevronRight,
 } from '../components/Icons.jsx';
 import SignInMethods from '../components/SignInMethods.jsx';
+import RoutineSheet from '../components/RoutineSheet.jsx';
+
+const CADENCE_LABEL = {
+  daily: 'Every day', weekly: 'Every week', monthly: 'Every month',
+  yearly: 'Every year', anytime: 'Whenever',
+};
 
 const THEME_ICON = { system: <IconAuto />, light: <IconSun />, dark: <IconMoon /> };
 
@@ -21,7 +29,6 @@ const draftOf = (s) => ({
   categories: [...s.categories],
   sources: [...s.sources],
   methods: [...s.methods],
-  budgets: { ...(s.budgets || {}) },
 });
 
 function ListEditor({ label, hint, placeholder, items, onChange }) {
@@ -82,6 +89,12 @@ export default function Settings() {
   const [theme, setTheme] = useTheme();
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(null);   // {} for a new routine, the routine for an edit
+  const [reload, setReload] = useState(0);
+
+  const routines = useApi(() => api.routines(), [reload]).data?.items || [];
+  const goals = useApi(() => api.goals(), []).data?.items || [];
+  const people = useApi(() => api.people(), []).data?.people?.map((p) => p.person) || [];
 
   useEffect(() => {
     if (settings) setDraft(draftOf(settings));
@@ -103,7 +116,6 @@ export default function Settings() {
 
   const set = (patch) => setDraft({ ...draft, ...patch });
   const openingTotal = Object.values(draft.openingBalances || {}).reduce((n, v) => n + (Number(v) || 0), 0);
-  const budgetTotal = Object.values(draft.budgets || {}).reduce((n, v) => n + (Number(v) || 0), 0);
 
   // The export endpoint is authenticated, so fetch it with the token and hand
   // the browser a blob rather than linking straight to the URL.
@@ -195,20 +207,42 @@ export default function Settings() {
 
       <div className="card">
         <div className="card-head">
-          <h2 className="card-title"><span className="card-ico"><IconTarget /></span>Monthly budgets</h2>
-          {budgetTotal > 0 && <span className="card-sub num">{money(budgetTotal, draft.currency)} total</span>}
+          <h2 className="card-title"><span className="card-ico"><IconTarget /></span>Routines</h2>
+          <button className="card-action" onClick={() => setEditing({})}>New<IconPlus /></button>
         </div>
         <p className="hint hint--lead">
-          Optional. A category that goes over its budget is flagged on the dashboard.
+          Entries you make over and over — a hundred into the jar, the rent every month.
+          Save the shape here and it becomes one tap on the dashboard. Nothing is ever
+          added without you confirming it.
         </p>
-        {draft.categories.map((c) => (
-          <NumberRow
-            key={c} label={c} currency={draft.currency}
-            value={draft.budgets[c]}
-            onChange={(v) => set({ budgets: { ...draft.budgets, [c]: v } })}
-          />
+
+        {!routines.length && <div className="tags-empty">No routines yet</div>}
+        {routines.map((r) => (
+          <button key={r._id} className="rt-row" onClick={() => setEditing(r)}>
+            <span className="rt-body">
+              <span className="rt-name">{r.label}</span>
+              <span className="rt-meta">
+                {KINDS[r.kind]?.short}
+                {r.goal?.name ? ` · ${r.goal.name}` : r.category ? ` · ${r.category}` : r.source ? ` · ${r.source}` : r.person ? ` · ${r.person}` : ''}
+                {` · ${r.method} · ${CADENCE_LABEL[r.cadence] || r.cadence}`}
+              </span>
+            </span>
+            <span className="rt-amt num">{money(r.amount, draft.currency)}</span>
+            <IconChevronRight />
+          </button>
         ))}
       </div>
+
+      {/* Savings buckets are the Savings tab's own thing — asked for often
+          enough here that the screen should say so rather than stay silent. */}
+      <Link className="card card--link" to="/savings">
+        <span className="card-ico"><IconSavings /></span>
+        <span className="cardlink-body">
+          <b>Savings buckets</b>
+          <span>Create and rename them, and set what each is aiming for, on the Savings tab.</span>
+        </span>
+        <IconChevronRight />
+      </Link>
 
       <div className="card">
         <div className="card-head"><h2 className="card-title"><span className="card-ico"><IconUser /></span>Account</h2></div>
@@ -237,6 +271,16 @@ export default function Settings() {
         Add My Hisab to your home screen for the full app experience — it works offline and
         syncs whatever you logged the moment you are back online.
       </div>
+
+      {editing && (
+        <RoutineSheet
+          key={editing._id || 'new'}
+          routine={editing._id ? editing : null}
+          goals={goals} people={people}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); setReload((n) => n + 1); }}
+        />
+      )}
 
       {dirty && (
         <div className="savebar" role="status">
