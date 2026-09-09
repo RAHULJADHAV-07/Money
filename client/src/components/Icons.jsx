@@ -88,6 +88,20 @@ export const IconSync = () => (
   <Icon><path d="M20 11.4A8 8 0 0 0 6.3 6.3L4 8.6" /><path d="M4 4.6v4h4" /><path d="M4 12.6A8 8 0 0 0 17.7 17.7L20 15.4" /><path d="M20 19.4v-4h-4" /></Icon>
 );
 export const IconUser = () => <Icon><circle cx="12" cy="8.4" r="3.8" /><path d="M4.8 20.2c0-3.7 3.2-6.1 7.2-6.1s7.2 2.4 7.2 6.1" /></Icon>;
+
+/* Show / hide what you are typing into a password box. The struck-through eye
+   is the "hidden" state, so the mark always shows what a tap would do. */
+export const IconEye = () => (
+  <Icon><path d="M2.6 12S6.4 5.9 12 5.9 21.4 12 21.4 12 17.6 18.1 12 18.1 2.6 12 2.6 12Z" /><circle cx="12" cy="12" r="3.1" /></Icon>
+);
+export const IconEyeOff = () => (
+  <Icon>
+    <path d="M9.9 6.3A8.9 8.9 0 0 1 12 6c5.6 0 9.4 6 9.4 6a17 17 0 0 1-3.2 3.8" />
+    <path d="M6.5 7.8A16.6 16.6 0 0 0 2.6 12s3.8 6 9.4 6a8.8 8.8 0 0 0 3.6-.75" />
+    <path d="M9.9 9.9a3.1 3.1 0 0 0 4.3 4.3" />
+    <path d="M4.2 4.2 19.8 19.8" />
+  </Icon>
+);
 export const IconTag = () => (
   <Icon><path d="M11.1 3.6H19a1.5 1.5 0 0 1 1.5 1.5v7.9a1.5 1.5 0 0 1-.44 1.06l-6.1 6.1a1.5 1.5 0 0 1-2.12 0l-7.36-7.36a1.5 1.5 0 0 1 0-2.12l6.1-6.1A1.5 1.5 0 0 1 11.1 3.6Z" /><circle cx="16.1" cy="8" r="1.25" /></Icon>
 );

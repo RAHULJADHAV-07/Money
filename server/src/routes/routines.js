@@ -27,6 +27,19 @@ export function isDue(cadence, lastDone, today) {
   return days >= 7;
 }
 
+/*
+ * Whether a day falls inside the routine's own stretch of calendar.
+ *
+ * Both ends are optional and inclusive: no start means it has always applied,
+ * no end means it always will. A routine outside its range is not due, is not
+ * offered on the dashboard, and refuses to run -- it is dormant, not deleted.
+ */
+export function inRange(startsOn, endsOn, day) {
+  if (startsOn && day < String(startsOn).slice(0, 10)) return false;
+  if (endsOn && day > String(endsOn).slice(0, 10)) return false;
+  return true;
+}
+
 function clean(body) {
   const doc = entryFields(body);
   if (doc.kind === 'transfer') throw bad('A transfer cannot be saved as a routine — add it from the ledger');
@@ -37,14 +50,25 @@ function clean(body) {
   const label = String(body.label || '').trim().slice(0, 60);
   if (!label) throw bad('Give the routine a name so you can recognise it');
 
-  return { ...doc, cadence, label };
+  /* Both ends are optional -- an empty box means "no bound", which is why this
+     cannot go through toDayKey, whose empty case is today. */
+  const startsOn = body.startsOn ? toDayKey(body.startsOn) : null;
+  const endsOn = body.endsOn ? toDayKey(body.endsOn) : null;
+  if (startsOn && endsOn && endsOn < startsOn) throw bad('The end date is before the start date');
+
+  return { ...doc, cadence, label, startsOn, endsOn };
 }
 
 router.get('/', wrap(async (req, res) => {
   const today = req.query.today ? toDayKey(req.query.today) : dayKey(startOfToday());
   const rows = await Routine.listActive(req.userId);
   res.json({
-    items: rows.map((r) => ({ ...Routine.toJSON(r), due: isDue(r.cadence, r.last_done, today) })),
+    items: rows.map((r) => {
+      // `active` is the range, `due` the rhythm within it: the dashboard hides
+      // the first and greys the second.
+      const active = inRange(r.starts_on, r.ends_on, today);
+      return { ...Routine.toJSON(r), active, due: active && isDue(r.cadence, r.last_done, today) };
+    }),
     today,
   });
 }));
@@ -87,6 +111,13 @@ router.post('/:id/run', wrap(async (req, res) => {
     ...entryFields({ ...saved, goal: saved.goal?._id || null }),
     date: req.body?.date ? toDayKey(req.body.date) : dayKey(startOfToday()),
   };
+  if (!inRange(saved.startsOn, saved.endsOn, doc.date)) {
+    throw bad(
+      saved.startsOn && doc.date < saved.startsOn
+        ? `"${saved.label}" does not start until ${saved.startsOn}`
+        : `"${saved.label}" stopped on ${saved.endsOn}`
+    );
+  }
   await assertOwnGoal(doc.goal, req.userId);
   await assertWalletCovers(req.userId, doc);
 

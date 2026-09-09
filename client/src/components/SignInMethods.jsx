@@ -4,7 +4,34 @@ import { auth as authApi } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { googleEnabled } from '../lib/google.js';
 import GoogleButton from './GoogleButton.jsx';
-import { IconUser, IconCheck, IconClose } from './Icons.jsx';
+import { IconUser, IconCheck, IconClose, IconEye, IconEyeOff } from './Icons.jsx';
+
+/* A password box you can look at. Typing a password you cannot see is how
+   people set one they cannot repeat, and each box keeps its own eye so showing
+   the new one does not reveal the old. */
+function PasswordField({ id, label, value, onChange, autoComplete, placeholder }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="field">
+      <label className="field-label" htmlFor={id}>{label}</label>
+      <div className="pw-wrap pw-wrap--icon">
+        <input
+          id={id} className="input" type={show ? 'text' : 'password'} value={value}
+          autoComplete={autoComplete} placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <button
+          type="button" className="pw-toggle pw-toggle--icon"
+          onClick={() => setShow((v) => !v)}
+          aria-label={show ? 'Hide password' : 'Show password'}
+          aria-pressed={show}
+        >
+          {show ? <IconEyeOff /> : <IconEye />}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 /*
  * One account, up to two ways into it. Whichever you started with, this is
@@ -86,17 +113,16 @@ export default function SignInMethods({ notify }) {
       {open && (
         <form className="method-form" onSubmit={savePassword}>
           {hasPassword && (
-            <div className="field">
-              <label className="field-label" htmlFor="cpw">Current password</label>
-              <input id="cpw" className="input" type="password" value={current} autoComplete="current-password"
-                     onChange={(e) => setCurrent(e.target.value)} placeholder="••••••••" />
-            </div>
+            <PasswordField
+              id="cpw" label="Current password" value={current} onChange={setCurrent}
+              autoComplete="current-password" placeholder="••••••••"
+            />
           )}
-          <div className="field">
-            <label className="field-label" htmlFor="npw">{hasPassword ? 'New password' : 'Choose a password'}</label>
-            <input id="npw" className="input" type="password" value={next} autoComplete="new-password"
-                   onChange={(e) => setNext(e.target.value)} placeholder="At least 8 characters" />
-          </div>
+          <PasswordField
+            id="npw" label={hasPassword ? 'New password' : 'Choose a password'}
+            value={next} onChange={setNext}
+            autoComplete="new-password" placeholder="At least 8 characters"
+          />
           <button className="btn btn--primary btn--block" type="submit" disabled={next.length < 8 || busy}>
             {busy ? 'Saving…' : hasPassword ? 'Change password' : 'Set password'}
           </button>

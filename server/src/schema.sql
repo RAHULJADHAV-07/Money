@@ -164,3 +164,12 @@ create table if not exists routines (
 );
 
 create index if not exists routines_user_idx on routines (user_id, archived, created_at);
+
+/* An optional stretch of calendar a routine belongs to -- a rent that starts in
+   October, a daily saving you only want through the festival month. Either end
+   may be null, which simply means "no bound that way". Outside the range the
+   routine is not due and is not offered on the dashboard; it is left alone
+   rather than deleted, so the same shape can be handed a new range later.
+   Added as ALTERs so a database made by an earlier version picks them up. */
+alter table routines add column if not exists starts_on date;
+alter table routines add column if not exists ends_on   date;

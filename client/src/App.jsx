@@ -30,15 +30,15 @@ const TITLES = {
   '/settings': ['Settings', 'categories, budgets, data'],
 };
 
-// Only these two screens are scoped to a month, so only these two get the stepper.
-const MONTH_ROUTES = ['/', '/ledger'];
+/* The ledger is the one screen scoped to a month, so it is the only one with a
+   stepper — the dashboard is always this month and needs no control for it.
 
-/* `scoped` is the ledger, which can be showing everything rather than a month —
-   the pill has to say so, or the arrows would look like they did nothing. */
-function MonthPill({ scoped = false }) {
+   The ledger can also be showing everything rather than a month, and the pill
+   has to say so, or the arrows would look like they did nothing. */
+function MonthPill() {
   const { month, setMonth, openMonthSheet, day, allTime } = useStore();
   const atNow = month >= monthKeyNow();
-  const showingAll = scoped && allTime && !day;
+  const showingAll = allTime && !day;
 
   return (
     <div className="monthpill">
@@ -93,7 +93,7 @@ function TopBar() {
             <p className="topbar-sub">{sub}</p>
           </div>
           <div className="topbar-actions">
-            {MONTH_ROUTES.includes(pathname) && <MonthPill scoped={pathname === '/ledger'} />}
+            {pathname === '/ledger' && <MonthPill />}
             <ThemeButton />
           </div>
         </div>
@@ -230,7 +230,6 @@ function Shell() {
       </button>
       <Nav />
 
-      <UpdateGate />
       <WhatsNew />
 
       {addSheet && <AddSheet key={addSheet.tx?._id || addSheet.kind || 'new'} />}
@@ -276,6 +275,11 @@ export default function App() {
           path="*"
           element={(
             <AuthProvider>
+              {/* Above the sign-in gate on purpose. An app sitting on the sign-in
+                  screen -- a session that expired, a launch while the API was
+                  still waking up -- would otherwise never check for a new
+                  version, and could sit on an old build indefinitely. */}
+              <UpdateGate />
               <Gate />
             </AuthProvider>
           )}

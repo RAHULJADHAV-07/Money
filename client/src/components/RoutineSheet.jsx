@@ -45,6 +45,9 @@ export default function RoutineSheet({ routine, goals, people, onClose, onSaved 
   const [method, setMethod] = useState(routine?.method || methods[0] || 'Cash');
   const [note, setNote] = useState(routine?.note || '');
   const [cadence, setCadence] = useState(routine?.cadence || 'daily');
+  // Both optional, and independent: a start with no end, or an end with no start.
+  const [startsOn, setStartsOn] = useState(routine?.startsOn || '');
+  const [endsOn, setEndsOn] = useState(routine?.endsOn || '');
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState('');
@@ -63,7 +66,9 @@ export default function RoutineSheet({ routine, goals, people, onClose, onSaved 
   };
   useEffect(() => { if (!editing && !label) setLabel(''); }, [kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const ready = Number(amount) > 0 && (needs !== 'person' || person.trim()) && (label.trim() || suggested());
+  const badRange = !!startsOn && !!endsOn && endsOn < startsOn;
+  const ready = Number(amount) > 0 && (needs !== 'person' || person.trim())
+    && (label.trim() || suggested()) && !badRange;
 
   async function save() {
     setSaving(true);
@@ -75,6 +80,8 @@ export default function RoutineSheet({ routine, goals, people, onClose, onSaved 
       method,
       note: note.trim(),
       cadence,
+      startsOn: startsOn || null,
+      endsOn: endsOn || null,
       category: needs === 'category' ? effCategory : '',
       source: needs === 'source' ? effSource : '',
       person: needs === 'person' ? person.trim() : '',
@@ -185,6 +192,36 @@ export default function RoutineSheet({ routine, goals, people, onClose, onSaved 
         </select>
         <div className="hint">
           Only decides when it shows as due. Nothing is ever added without you tapping it.
+        </div>
+      </div>
+
+      {/* A stretch of calendar the routine belongs to -- rent from the month you
+          move in, a daily saving only until the wedding. Left empty, which is
+          the normal case, it simply runs for good. */}
+      <div className="field">
+        <span className="field-label">Only between these dates <span className="field-note">optional</span></span>
+        <div className="row-2">
+          <input
+            className="input" type="date" aria-label="First day" value={startsOn}
+            onChange={(e) => setStartsOn(e.target.value)}
+          />
+          <input
+            className="input" type="date" aria-label="Last day" value={endsOn} min={startsOn || undefined}
+            onChange={(e) => setEndsOn(e.target.value)}
+          />
+        </div>
+        {(startsOn || endsOn) && (
+          <button className="btn btn--sm btn--ghost" style={{ marginTop: 10 }}
+                  onClick={() => { setStartsOn(''); setEndsOn(''); }}>
+            Clear dates
+          </button>
+        )}
+        <div className="hint">
+          {badRange
+            ? 'The last day is before the first one.'
+            : startsOn || endsOn
+              ? 'Outside these days the routine stays saved, but is not offered on the dashboard.'
+              : 'Leave both empty and it runs for good. Fill one in and it only shows up from — or until — that day.'}
         </div>
       </div>
 

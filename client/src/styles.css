@@ -1295,6 +1295,13 @@ select.input {
   padding: 7px 10px; border-radius: var(--r-xs);
 }
 .pw-toggle:hover { background: var(--surface-3); color: var(--ink-2); }
+
+/* The same toggle drawn as an eye, for forms where a word beside the box would
+   crowd it. The input's right padding shrinks to match the smaller target. */
+.pw-wrap--icon .input { padding-right: 44px; }
+.pw-toggle--icon { display: grid; place-items: center; padding: 6px; }
+.pw-toggle--icon svg { width: 18px; height: 18px; }
+.pw-toggle--icon[aria-pressed="true"] { color: var(--ink-2); }
 .pw-meter { display: flex; align-items: center; gap: 5px; margin-top: 9px; }
 .pw-meter i {
   height: 4px; width: 26px; border-radius: 2px; background: var(--track);

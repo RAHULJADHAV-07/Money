@@ -29,6 +29,9 @@ export const toJSON = (r) => ({
   method: r.method,
   toMethod: r.to_method,
   cadence: r.cadence,
+  // Either end may be null: an open-ended routine has no bound that way.
+  startsOn: r.starts_on || null,
+  endsOn: r.ends_on || null,
   lastDone: r.last_done,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
@@ -41,12 +44,14 @@ export const findOne = (id, userId) =>
   one(`${SELECT} where r.id = $1 and r.user_id = $2`, [id, userId]);
 
 const VALUES = (userId, d) =>
-  [userId, d.label, d.kind, d.amount, d.category, d.source, d.person, d.goal, d.note, d.method, d.toMethod, d.cadence];
+  [userId, d.label, d.kind, d.amount, d.category, d.source, d.person, d.goal, d.note, d.method, d.toMethod,
+   d.cadence, d.startsOn, d.endsOn];
 
 export async function create(userId, doc) {
   const row = await one(
-    `insert into routines (user_id, label, kind, amount, category, source, person, goal_id, note, method, to_method, cadence)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning id`,
+    `insert into routines (user_id, label, kind, amount, category, source, person, goal_id, note, method, to_method,
+                           cadence, starts_on, ends_on)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) returning id`,
     VALUES(userId, doc)
   );
   return findOne(row.id, userId);
@@ -55,7 +60,8 @@ export async function create(userId, doc) {
 export async function update(id, userId, doc) {
   const row = await one(
     `update routines set label = $3, kind = $4, amount = $5, category = $6, source = $7, person = $8,
-            goal_id = $9, note = $10, method = $11, to_method = $12, cadence = $13, updated_at = now()
+            goal_id = $9, note = $10, method = $11, to_method = $12, cadence = $13,
+            starts_on = $14, ends_on = $15, updated_at = now()
       where id = $1 and user_id = $2 returning id`,
     [id, userId, ...VALUES(userId, doc).slice(1)]
   );

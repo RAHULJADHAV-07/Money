@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useApi, useStore } from '../lib/store.jsx';
-import { moneyRound, money, moneyParts, compact, todayKey, monthShort } from '../lib/format.js';
+import { moneyRound, money, moneyParts, compact, todayKey, monthKeyNow, monthShort } from '../lib/format.js';
 import TxList from '../components/TxList.jsx';
 import Alert from '../components/Alert.jsx';
 import { CategoryBars } from '../components/Charts.jsx';
 import { walletHue } from '../lib/palette.js';
 import { KINDS } from '../lib/kinds.js';
 import {
-  IconArrowUpRight, IconChevronRight, IconChevronDown, IconWallet, IconCheck,
+  IconArrowUpRight, IconChevronRight, IconWallet, IconCheck,
   IconSavings, IconIncoming, IconOutgoing, KindIcon,
 } from '../components/Icons.jsx';
 
@@ -55,12 +55,19 @@ function Skeleton() {
 }
 
 export default function Home() {
-  const { month, currency, openAdd, settings, openMonthSheet, refresh, notify, apiBehind } = useStore();
+  const { currency, openAdd, settings, refresh, notify, apiBehind } = useStore();
   const navigate = useNavigate();
+  /* The dashboard is this month, always. Stepping back through months is what
+     the ledger is for, and a second stepper here only ever answered a question
+     nobody was asking of a screen titled "at a glance". */
+  const month = monthKeyNow();
   const catOrder = settings?.categories || [];
   const walletOrder = settings?.methods || [];
   const { data, loading, error } = useApi(() => api.summary(month, todayKey()), [month]);
-  const routines = useApi(() => api.routines(todayKey()), []).data?.items || [];
+  /* A routine outside its own date range is not offered at all -- `active` is
+     false only once the API knows about ranges, so an older one shows them all. */
+  const routines = (useApi(() => api.routines(todayKey()), []).data?.items || [])
+    .filter((r) => r.active !== false);
   const [ask, setAsk] = useState(null);      // the routine awaiting a yes
   const [alert, setAlert] = useState(null);
   const [running, setRunning] = useState(false);
@@ -103,9 +110,6 @@ export default function Home() {
       <section className="hero">
         <div className="hero-top">
           <span className="hero-label">Balance in hand</span>
-          <button className="hero-chip" onClick={openMonthSheet}>
-            {monthShort(month)} <IconChevronDown />
-          </button>
         </div>
 
         <HeroAmount value={cards.balance} currency={currency} />

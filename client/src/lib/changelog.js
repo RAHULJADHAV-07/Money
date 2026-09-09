@@ -10,6 +10,15 @@ import { isNewer } from './version.js';
 
 export const CHANGELOG = [
   {
+    version: '2.0.1',
+    title: 'Routines that know their dates',
+    changes: [
+      'A routine can now be given a start and an end date — rent from the month you move in, a daily saving only until December. Both are optional, and outside those days the routine simply stays off your dashboard. Set them under More → Routines.',
+      'The password boxes in settings have an eye, so you can check what you typed before saving it.',
+      'The home screen no longer switches months. It is always this month; the ledger is where you go back through them.',
+    ],
+  },
+  {
     version: '2.0.0',
     title: 'Splits, routines, and a ledger that shows everything',
     changes: [

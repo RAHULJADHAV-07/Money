@@ -12,7 +12,9 @@ import { IconSync } from './Icons.jsx';
  * old version keeps working perfectly in the meantime.
  */
 export default function UpdateGate() {
-  const { addSheet, splitSheet, monthSheet } = useStore();
+  /* This sits above the sign-in gate, so there may be no store at all -- signed
+     out there is nothing half-typed to protect, and the update applies at once. */
+  const store = useStore();
   const [ready, setReady] = useState(false);
   const [applying, setApplying] = useState(false);
 
@@ -21,7 +23,7 @@ export default function UpdateGate() {
     return onUpdateReady(setReady);
   }, []);
 
-  const busy = !!addSheet || !!splitSheet || monthSheet;
+  const busy = !!store?.addSheet || !!store?.splitSheet || !!store?.monthSheet;
 
   useEffect(() => {
     if (!ready || busy) { setApplying(false); return; }

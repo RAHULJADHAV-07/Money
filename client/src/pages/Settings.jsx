@@ -4,7 +4,7 @@ import { api, getToken } from '../lib/api.js';
 import { useApi, useStore } from '../lib/store.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { useTheme, THEMES } from '../lib/theme.js';
-import { money } from '../lib/format.js';
+import { money, dayLabel } from '../lib/format.js';
 import { KINDS } from '../lib/kinds.js';
 import {
   IconSun, IconMoon, IconAuto, IconDownload, IconLogout, IconClose, IconPlus,
@@ -19,6 +19,19 @@ const CADENCE_LABEL = {
 };
 
 const THEME_ICON = { system: <IconAuto />, light: <IconSun />, dark: <IconMoon /> };
+
+/* A routine's date range, said the way you would say it out loud, and only when
+   it has one -- most do not. `active` is false while today sits outside it,
+   which is the whole reason the row has to mention the range at all: it is the
+   answer to "why is this not on my dashboard". */
+function whenLabel(r) {
+  const range = r.startsOn && r.endsOn ? `${dayLabel(r.startsOn)} – ${dayLabel(r.endsOn)}`
+    : r.startsOn ? `from ${dayLabel(r.startsOn)}`
+    : r.endsOn ? `until ${dayLabel(r.endsOn)}`
+    : '';
+  if (!range) return '';
+  return r.active === false ? ` · ${range} · not running now` : ` · ${range}`;
+}
 
 // Everything the settings form owns, in one place, so "has this changed?" is a
 // single comparison rather than a field-by-field one.
@@ -225,6 +238,7 @@ export default function Settings() {
                 {KINDS[r.kind]?.short}
                 {r.goal?.name ? ` · ${r.goal.name}` : r.category ? ` · ${r.category}` : r.source ? ` · ${r.source}` : r.person ? ` · ${r.person}` : ''}
                 {` · ${r.method} · ${CADENCE_LABEL[r.cadence] || r.cadence}`}
+                {whenLabel(r)}
               </span>
             </span>
             <span className="rt-amt num">{money(r.amount, draft.currency)}</span>
