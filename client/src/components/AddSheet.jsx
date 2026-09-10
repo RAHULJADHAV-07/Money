@@ -2,19 +2,24 @@ import { useEffect, useMemo, useState } from 'react';
 import Sheet from './Sheet.jsx';
 import { api } from '../lib/api.js';
 import { useStore } from '../lib/store.jsx';
-import { KINDS, isSettle, dirOf } from '../lib/kinds.js';
+import { KINDS, isSettle, dirOf, pickLabel } from '../lib/kinds.js';
 import { todayKey, money } from '../lib/format.js';
-import { IconTrash, IconSplit, IconChevronRight, KindIcon } from './Icons.jsx';
+import { IconTrash, IconSplit, IconChevronRight, IconChevronDown, KindIcon } from './Icons.jsx';
 import Alert from './Alert.jsx';
 
 const TONE_OF = (kind) => KINDS[kind]?.tone || 'out';
 
-/* Grouped by what the entry is about rather than listed flat. Eleven names in a
-   row is a wall; three short groups is a thing you can read. The headings are
-   also the fastest way to find a kind you have not used before — you know
-   whether it involves a person before you know what it is called. */
-const KIND_GROUPS = [
-  { label: 'Everyday', kinds: ['expense', 'income', 'transfer'] },
+/* Three types answer almost every entry, and eight more answer the rest. Showing
+   all eleven at once made the common case pay for the rare one: a wall of names
+   to read past, and the amount box pushed off the bottom of the screen.
+
+   So the three lead, and the other eight are one tap away. The groups behind
+   that tap are still grouped by what the entry is about, because that is how
+   you find a kind you have never used — you know whether it involves a person
+   before you know what it is called. */
+const EVERYDAY = ['expense', 'income', 'transfer'];
+
+const MORE_GROUPS = [
   { label: 'With people', kinds: ['lent', 'borrowed', 'repay_received', 'repay_paid', 'settle_received', 'settle_paid'] },
   { label: 'Savings', kinds: ['saving_in', 'saving_out'] },
 ];
@@ -51,6 +56,10 @@ export default function AddSheet() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  /* Opens itself whenever the chosen kind lives inside it -- editing a saved
+     repayment, or the sheet opened straight onto one -- because a picker that
+     hid its own selection would be lying about what is set. */
+  const [showMore, setShowMore] = useState(() => !EVERYDAY.includes(addSheet?.tx?.kind || addSheet?.kind || 'expense'));
 
   useEffect(() => {
     api.goals().then((g) => setGoals(g.items)).catch(() => {});
@@ -89,6 +98,8 @@ export default function AddSheet() {
       if (addSheet?.note) setNote(addSheet.note);
     }
   }, [editing, addSheet]);
+
+  useEffect(() => { if (!EVERYDAY.includes(kind)) setShowMore(true); }, [kind]);
 
   const needs = KINDS[kind]?.needs;
   const categories = settings?.categories || [];
@@ -185,32 +196,79 @@ export default function AddSheet() {
     <Sheet title={title} subtitle={KINDS[kind]?.label} onClose={closeAdd}>
       {error && <div className="error-msg" role="alert">{error}</div>}
 
-      {/* Every type, wrapped rather than scrolled — nothing hidden off the side,
-          and no grid of tiles to wade through either. */}
+      {/* The three that answer almost everything, then a way to the other eight.
+          No heading over these: with a labelled drawer underneath, "Everyday"
+          was a word explaining something already obvious. */}
       <div className="kindpick">
-        {KIND_GROUPS.map((g) => (
-          <div className="kindgroup" key={g.label} role="radiogroup" aria-label={g.label}>
-            <span className="kindgroup-l">{g.label}</span>
-            <div className="kindrow">
-              {g.kinds.map((k) => (
-                <button
-                  key={k} type="button" role="radio" aria-checked={kind === k}
-                  className={`kpill kpill--${TONE_OF(k)}`}
-                  onClick={() => setKind(k)}
-                >
-                  <KindIcon kind={k} />
-                  {KINDS[k].short}
-                </button>
-              ))}
+        <div className="kindrow" role="radiogroup" aria-label="Everyday">
+          {EVERYDAY.map((k) => (
+            <button
+              key={k} type="button" role="radio" aria-checked={kind === k}
+              className={`kpill kpill--${TONE_OF(k)}`}
+              onClick={() => setKind(k)}
+            >
+              <KindIcon kind={k} />
+              {pickLabel(k)}
+            </button>
+          ))}
+        </div>
+
+        {!showMore ? (
+          <button
+            type="button" className="kindmore" aria-expanded="false"
+            onClick={() => setShowMore(true)}
+          >
+            <IconChevronDown />
+            Other ways to log this
+          </button>
+        ) : (
+          MORE_GROUPS.map((g) => (
+            <div className="kindgroup" key={g.label} role="radiogroup" aria-label={g.label}>
+              <span className="kindgroup-l">{g.label}</span>
+              <div className="kindrow">
+                {g.kinds.map((k) => (
+                  <button
+                    key={k} type="button" role="radio" aria-checked={kind === k}
+                    className={`kpill kpill--${TONE_OF(k)}`}
+                    onClick={() => setKind(k)}
+                  >
+                    <KindIcon kind={k} />
+                    {pickLabel(k)}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
+      </div>
+
+      <div className="field field--lead">
+        <label className="field-label" htmlFor="amt">Amount</label>
+        <div className="amount-field">
+          <span className="amount-cur">{currency}</span>
+          <input
+            id="amt" type="number" inputMode="decimal" placeholder="0"
+            value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus
+            className={`amount-input tone-text-${tone === 'flat' ? 'ink' : tone}`}
+          />
+        </div>
+        {short && (
+          <p className="field-warn" role="status">
+            {available <= 0.005
+              ? `${effMethod} is empty — this needs ${money(spend, currency)}.`
+              : `${effMethod} has ${money(available, currency)} — ${money(spend - available, currency)} short.`}
+          </p>
+        )}
       </div>
 
       {/* One payment can mean several things at once — half yours, half theirs,
           or a repayment that came back with extra. That does not fit one kind,
           so it gets its own sheet. What you have typed goes across with you, so
-          realising halfway through does not mean starting again. */}
+          realising halfway through does not mean starting again.
+
+          Below the amount rather than above it: it is a second thought about a
+          figure you have already typed, and as the first thing in the sheet it
+          pushed that figure off the screen. */}
       {!editing && !apiBehind && (
         <button
           type="button" className="splitcue"
@@ -233,25 +291,6 @@ export default function AddSheet() {
           <IconChevronRight />
         </button>
       )}
-
-      <div className="field field--lead">
-        <label className="field-label" htmlFor="amt">Amount</label>
-        <div className="amount-field">
-          <span className="amount-cur">{currency}</span>
-          <input
-            id="amt" type="number" inputMode="decimal" placeholder="0"
-            value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus
-            className={`amount-input tone-text-${tone === 'flat' ? 'ink' : tone}`}
-          />
-        </div>
-        {short && (
-          <p className="field-warn" role="status">
-            {available <= 0.005
-              ? `${effMethod} is empty — this needs ${money(spend, currency)}.`
-              : `${effMethod} has ${money(available, currency)} — ${money(spend - available, currency)} short.`}
-          </p>
-        )}
-      </div>
 
       {needs === 'category' && (
         <div className="field">
