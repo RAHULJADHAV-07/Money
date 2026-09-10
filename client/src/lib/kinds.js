@@ -1,13 +1,22 @@
 // Mirrors the server's ledger kinds, plus how each one presents in the UI.
+//
+// `short` is the record voice — what a logged entry calls itself in the ledger,
+// where the person and the amount are already beside it: "Paid back · Mom".
+// `pick` is the button voice, used only by the add sheet's type picker. There
+// the entry does not exist yet and nothing else is on screen to disambiguate,
+// so direction is the whole question — who lent, who repaid, whose debt is
+// being dropped. Waived and Forgiven are the pair that needed it most: as
+// buttons neither says whose money it was. Kinds where the two voices agree
+// carry no `pick` at all, and nothing already saved changes its wording.
 export const KINDS = {
   expense:        { label: 'Spent',         short: 'Expense',   cta: 'Add expense',      dir: -1, needs: 'category', icon: '↑', tone: 'out' },
   income:         { label: 'Received',      short: 'Income',    cta: 'Add income',       dir: +1, needs: 'source',   icon: '↓', tone: 'in'  },
-  lent:           { label: 'Lent out',      short: 'Lent',      cta: 'Record lending',   dir: -1, needs: 'person',   icon: '→', tone: 'out' },
-  borrowed:       { label: 'Borrowed',      short: 'Borrowed',  cta: 'Record borrowing', dir: +1, needs: 'person',   icon: '←', tone: 'in'  },
-  repay_received: { label: 'Got back',      short: 'Got back',  cta: 'Record repayment', dir: +1, needs: 'person',   icon: '←', tone: 'in'  },
-  repay_paid:     { label: 'Paid back',     short: 'Paid back', cta: 'Record repayment', dir: -1, needs: 'person',   icon: '→', tone: 'out' },
-  saving_in:      { label: 'To savings',    short: 'Saved',     cta: 'Add to savings',   dir: -1, needs: 'goal',     icon: '⌂', tone: 'save'},
-  saving_out:     { label: 'From savings',  short: 'Withdrew',  cta: 'Withdraw',         dir: +1, needs: 'goal',     icon: '⌂', tone: 'in'  },
+  lent:           { label: 'Lent out',      short: 'Lent',      cta: 'Record lending',   dir: -1, needs: 'person',   icon: '→', tone: 'out', pick: 'I lent' },
+  borrowed:       { label: 'Borrowed',      short: 'Borrowed',  cta: 'Record borrowing', dir: +1, needs: 'person',   icon: '←', tone: 'in',  pick: 'I borrowed' },
+  repay_received: { label: 'Got back',      short: 'Got back',  cta: 'Record repayment', dir: +1, needs: 'person',   icon: '←', tone: 'in',  pick: 'They repaid me' },
+  repay_paid:     { label: 'Paid back',     short: 'Paid back', cta: 'Record repayment', dir: -1, needs: 'person',   icon: '→', tone: 'out', pick: 'I repaid them' },
+  saving_in:      { label: 'To savings',    short: 'Saved',     cta: 'Add to savings',   dir: -1, needs: 'goal',     icon: '⌂', tone: 'save', pick: 'Into savings' },
+  saving_out:     { label: 'From savings',  short: 'Withdrew',  cta: 'Withdraw',         dir: +1, needs: 'goal',     icon: '⌂', tone: 'in',  pick: 'Out of savings' },
 
   // Money you only carried: in one hand, straight out the other. Net zero, and
   // neither an expense nor an income nor a debt -- it is here so that money
@@ -15,8 +24,8 @@ export const KINDS = {
   pass_through:   { label: 'Passed on',     short: 'Passed on', cta: 'Record pass-through', dir: 0, needs: 'person', icon: '⇢', tone: 'flat' },
 
   // Cleared by agreement — no money moves.
-  settle_received: { label: 'Waived off',   short: 'Waived',    cta: 'Mark as waived',    dir: 0, needs: 'person',   icon: '✓', tone: 'flat' },
-  settle_paid:     { label: 'Forgiven',     short: 'Forgiven',  cta: 'Mark as forgiven',  dir: 0, needs: 'person',   icon: '✓', tone: 'flat' },
+  settle_received: { label: 'Waived off',   short: 'Waived',    cta: 'Mark as waived',    dir: 0, needs: 'person',   icon: '✓', tone: 'flat', pick: 'Drop what they owe' },
+  settle_paid:     { label: 'Forgiven',     short: 'Forgiven',  cta: 'Mark as forgiven',  dir: 0, needs: 'person',   icon: '✓', tone: 'flat', pick: 'Drop what I owe' },
 
   // Your own money moving between wallets.
   transfer:       { label: 'Transfer',      short: 'Transfer',  cta: 'Add transfer',      dir: 0, needs: 'transfer', icon: '⇄', tone: 'flat' },
@@ -41,6 +50,8 @@ export const PART_ORDER = [
 ];
 
 export const labelOf = (k) => KINDS[k]?.label || k;
+/** What the type picker calls a kind — its button voice, falling back to its record one. */
+export const pickLabel = (k) => KINDS[k]?.pick || KINDS[k]?.short || k;
 export const dirOf = (k) => KINDS[k]?.dir ?? 0;
 export const isSettle = (k) => k === 'settle_received' || k === 'settle_paid';
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api, pendingWrites } from '../lib/api.js';
 import { useApi, useStore } from '../lib/store.jsx';
-import { money, monthLabel, dayLabel, fullDayLabel } from '../lib/format.js';
+import { money, moneyRound, monthLabel, dayLabel, fullDayLabel } from '../lib/format.js';
 import { IconSearch, IconClose, IconChevronRight, IconInbox } from '../components/Icons.jsx';
 import { FlowBar } from '../components/Charts.jsx';
 import TxList from '../components/TxList.jsx';
@@ -23,6 +23,19 @@ export default function Transactions() {
   const [q, setQ] = useState('');
 
   const wallets = settings?.methods?.length ? settings.methods : ['Cash', 'UPI', 'Bank', 'Card'];
+
+  /* What each wallet holds right now, so picking one answers "and how much is
+     left in it?" without a trip to the dashboard. The same endpoint the add
+     sheet uses, and it re-runs on every write, so the figures never go stale.
+     No deps: balances are all-time and never depend on the filters below. */
+  const { data: walletData } = useApi(() => api.wallets(), []);
+  const balanceOf = (name) => walletData?.wallets?.find((w) => w.name === name)?.balance;
+  /* One wallet shows its own balance; "All wallets" shows what they add up to,
+     which is the same figure the dashboard calls the balance. */
+  const shown = method
+    ? balanceOf(method)
+    : walletData?.wallets?.reduce((n, w) => n + w.balance, 0);
+
   const { data, loading } = useApi(
     () => api.transactions({
       limit: 300,
@@ -105,10 +118,26 @@ export default function Transactions() {
           </select>
         </div>
         <div className="field">
-          <label className="field-label" htmlFor="f-method">Paid with</label>
+          <label className="field-label" htmlFor="f-method">
+            Paid with
+            {/* Exact beside the label, rounded inside the list — a dropdown row
+                on a narrow phone has no room for paise. */}
+            {shown !== undefined && (
+              <span className={`field-note${shown < 0 ? ' field-note--neg' : ''}`}>
+                {money(shown, currency)}{method ? '' : ' in all'}
+              </span>
+            )}
+          </label>
           <select id="f-method" className="input" value={method} onChange={(e) => setMethod(e.target.value)}>
             <option value="">All wallets</option>
-            {wallets.map((m) => <option key={m} value={m}>{m}</option>)}
+            {wallets.map((m) => {
+              const b = balanceOf(m);
+              return (
+                <option key={m} value={m}>
+                  {b === undefined ? m : `${m} · ${moneyRound(b, currency)}`}
+                </option>
+              );
+            })}
           </select>
         </div>
       </div>
