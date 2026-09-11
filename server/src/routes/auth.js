@@ -4,6 +4,8 @@ import * as Settings from '../models/Settings.js';
 import { signToken, requireAuth, optionalUserId } from '../lib/auth.js';
 import { verifyGoogleToken, googleEnabled } from '../lib/google.js';
 import { sendWelcome } from '../lib/welcome-email.js';
+import { sendPasswordReset } from '../lib/reset-email.js';
+import { signResetToken, readResetToken, stillFresh } from '../lib/reset.js';
 import { wrap } from '../lib/async.js';
 
 const router = Router();
@@ -130,6 +132,57 @@ router.put('/password', requireAuth, wrap(async (req, res) => {
 
   const updated = await User.setPasswordHash(user.id, await User.hash(password));
   res.json({ user: User.toSafeJSON(updated) });
+}));
+
+/*
+ * Forgotten passwords, in two steps and without a table to track them.
+ *
+ * The answer is the same whether or not the address has an account: this
+ * endpoint needs no token, so a different answer would turn it into a way to
+ * harvest which emails are registered. /signup already discloses that to
+ * someone who tries hard enough, but it at least makes them try.
+ */
+router.post('/forgot', wrap(async (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const said = { ok: true, sent: 'If that address has an account, a reset link is on its way.' };
+  if (!EMAIL_RE.test(email)) return res.json(said);
+
+  const user = await User.findByEmail(email);
+  if (!user) return res.json(said);
+
+  /* Awaited, unlike the welcome mail: someone staring at a "check your inbox"
+     screen should not be told it worked if the mail never left. The error is
+     logged rather than returned, so a mail outage still does not reveal
+     whether the address exists. */
+  try {
+    await sendPasswordReset(user, signResetToken(user));
+  } catch (err) {
+    console.error(`[auth] reset mail to ${user.email} failed: ${err.message}`);
+  }
+  res.json(said);
+}));
+
+/* Consumes the link. Signs the user straight in afterwards -- they have just
+   proved they hold the inbox and chosen a password, so sending them back to
+   type it again would be ceremony. */
+router.post('/reset', wrap(async (req, res) => {
+  const password = String(req.body.password || '');
+  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+
+  const { userId, pwf } = readResetToken(req.body.token);
+  const user = await User.findById(userId);
+  if (!user) return res.status(400).json({ error: 'That reset link is not valid. Ask for a new one.', code: 'RESET_INVALID' });
+
+  // What makes the link single-use: the password it was issued against has changed.
+  if (!stillFresh(user, pwf)) {
+    return res.status(400).json({
+      error: 'That reset link has already been used. Ask for a new one.',
+      code: 'RESET_USED',
+    });
+  }
+
+  const updated = await User.setPasswordHash(user.id, await User.hash(password));
+  res.json({ token: signToken(updated.id), user: User.toSafeJSON(updated) });
 }));
 
 router.get('/me', requireAuth, wrap(async (req, res) => {

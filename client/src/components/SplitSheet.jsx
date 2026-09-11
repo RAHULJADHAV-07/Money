@@ -51,21 +51,42 @@ const REASON_FOR = {
   saving_in:      ['out', 'saved'],
 };
 
-/* Everything already typed on the add sheet, carried across: the amount, who it
-   was with, the wallet, and the first part filled in as the thing you had said
-   it was. All that is left is to say what the rest of it was. */
-function fromEntry(from, fallbackMethod) {
-  const [direction, reason] = REASON_FOR[from.kind] || ['in', 'repaid'];
-  const f = blankFlow(direction, from.method || fallbackMethod);
+/* Everything already typed on the add sheet, carried into whichever shape was
+   chosen: the amount, who it was with, and the wallet.
+
+   These used to run off `from.kind` alone and seed the form before it was ever
+   shown, which meant the three shapes below were never offered and `blankBill`
+   was unreachable -- so "Was this a bill you shared?" could not lead to a
+   shared bill. Now the shape is asked first and the answers follow it. */
+function flowFrom(direction, from, fallbackMethod) {
+  const f = blankFlow(direction, from?.method || fallbackMethod);
+  if (!from) return f;
   f.amount = from.amount > 0 ? String(from.amount) : '';
   f.person = from.person || '';
-  f.rows[0] = {
-    ...f.rows[0], reason,
-    category: from.category || '', source: from.source || '', goal: from.goal || '',
-  };
-  const second = REASONS[direction].find((r) => r.id !== reason);
-  f.rows[1] = { ...f.rows[1], reason: second.id };
+
+  /* The first row is only filled in when the chosen direction agrees with what
+     was being typed. Picking "money came to me" after typing an expense is a
+     correction, not a detail worth preserving. */
+  const [derived, reason] = REASON_FOR[from.kind] || [];
+  if (derived === direction && reason) {
+    f.rows[0] = {
+      ...f.rows[0], reason,
+      category: from.category || '', source: from.source || '', goal: from.goal || '',
+    };
+    const second = REASONS[direction].find((r) => r.id !== reason);
+    if (second) f.rows[1] = { ...f.rows[1], reason: second.id };
+  }
   return f;
+}
+
+function billFrom(from, fallbackMethod) {
+  const b = blankBill(from?.method || fallbackMethod);
+  if (!from) return b;
+  b.total = from.amount > 0 ? String(from.amount) : '';
+  b.category = from.category || '';
+  // A name already typed is the other person at the table, not you.
+  if (from.person) b.people = b.people.map((x, i) => (i === 1 ? { ...x, name: from.person } : x));
+  return b;
 }
 
 const SHAPES = [
@@ -82,8 +103,9 @@ export default function SplitSheet() {
   const categories = settings?.categories || [];
   const sources = settings?.sources || [];
 
-  const [form, setForm] = useState(() =>
-    splitSheet?.from?.kind ? fromEntry(splitSheet.from, settings?.methods?.[0] || 'Cash') : null);
+  /* Deliberately null, even when arriving from the add sheet: the shape is the
+     first thing asked, and `pick` below seeds it from whatever was typed. */
+  const [form, setForm] = useState(null);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(todayKey);
   const [goals, setGoals] = useState([]);
@@ -144,9 +166,10 @@ export default function SplitSheet() {
   const scrollToTail = () =>
     requestAnimationFrame(() => tailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
 
+  const from = splitSheet?.from || null;
   const pick = (id) => {
     const method = methods[0] || 'Cash';
-    setForm(id === 'bill' ? blankBill(method) : blankFlow(id, method));
+    setForm(id === 'bill' ? billFrom(from, method) : flowFrom(id, from, method));
   };
 
   /* One tap for the arithmetic nobody wants to do at a table: the bill divided
@@ -238,6 +261,13 @@ export default function SplitSheet() {
     return (
       <Sheet title="What happened?" subtitle="One thing that meant more than one thing" onClose={closeSplit}>
         {error && <div className="error-msg" role="alert">{error}</div>}
+        {/* Said out loud, because otherwise picking a shape looks like it might
+            throw away the amount already typed next door. */}
+        {from?.amount > 0 && (
+          <p className="shapes-carry">
+            {money(from.amount)}{from.person ? ` with ${from.person}` : ''} comes with you.
+          </p>
+        )}
         <div className="shapes">
           {SHAPES.map((s) => (
             <button key={s.id} type="button" className="shape" onClick={() => pick(s.id)}>

@@ -107,7 +107,7 @@ export default function Home() {
 
   return (
     <>
-      <section className="hero">
+      <section className="hero" data-tour="balance">
         <div className="hero-top">
           <span className="hero-label">Balance in hand</span>
         </div>
@@ -138,7 +138,7 @@ export default function Home() {
 
         <div className="home-grid">
           {activeWallets.length > 0 && (
-            <section className="g-wallets">
+            <section className="g-wallets" data-tour="wallets">
               <div className="section-label">Where your money sits</div>
               <div className="wallet-rail">
                 {activeWallets.map((w) => {

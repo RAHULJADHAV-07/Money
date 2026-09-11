@@ -36,6 +36,15 @@
           var dark = m === 'dark' || (m === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
           var meta = document.querySelector('meta[name="theme-color"]');
           if (meta) meta.setAttribute('content', dark ? '#080b0a' : '#f4f6f4');
+
+          /* The chosen accent, stamped before the stylesheet lands — every
+             surface is oklch at this hue, so without it the app would paint
+             once in the default green and again in whatever was picked. */
+          var a = JSON.parse(localStorage.getItem('hisab.appearance.v1') || '{}');
+          if (a && isFinite(Number(a.accent))) {
+            document.documentElement.style.setProperty('--accent-h', String(Number(a.accent)));
+          }
+          if (a && a.surface) document.documentElement.setAttribute('data-surface', a.surface);
         } catch (e) { /* private mode — the default light theme is fine */ }
       })();
     </script>

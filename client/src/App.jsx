@@ -13,6 +13,9 @@ import AddSheet from './components/AddSheet.jsx';
 import SplitSheet from './components/SplitSheet.jsx';
 import UpdateGate from './components/UpdateGate.jsx';
 import WhatsNew from './components/WhatsNew.jsx';
+import Tour from './components/Tour.jsx';
+import AppearanceSheet from './components/AppearanceSheet.jsx';
+import { useFirstRun } from './lib/onboarding.js';
 import MonthSheet from './components/MonthSheet.jsx';
 import Home from './pages/Home.jsx';
 import Transactions from './pages/Transactions.jsx';
@@ -20,6 +23,7 @@ import People from './pages/People.jsx';
 import Savings from './pages/Savings.jsx';
 import Settings from './pages/Settings.jsx';
 import Privacy from './pages/Privacy.jsx';
+import ResetPassword from './pages/ResetPassword.jsx';
 import { monthLabel, monthShort, shiftMonth, monthKeyNow, dayLabel } from './lib/format.js';
 
 const TITLES = {
@@ -62,18 +66,20 @@ function MonthPill() {
   );
 }
 
-const NEXT_THEME = { system: 'light', light: 'dark', dark: 'system' };
 const THEME_ICON = { system: <IconAuto />, light: <IconSun />, dark: <IconMoon /> };
 
-function ThemeButton() {
-  const [theme, setTheme] = useTheme();
+/* Opens the whole Appearance panel rather than cycling the three modes. The
+   cycle was a smaller thing behind the same icon: three states you had to tap
+   through to find, with the accent and the surfaces nowhere near it. */
+function AppearanceButton() {
+  const [theme] = useTheme();
+  const { openAppearance } = useStore();
+  /* The sheet itself is rendered by Shell, not here. .topbar has a
+     backdrop-filter, which makes it the containing block for any fixed-position
+     descendant — a sheet rendered from this button lays itself out inside the
+     header strip instead of over the page. */
   return (
-    <button
-      className="icon-btn"
-      onClick={() => setTheme(NEXT_THEME[theme])}
-      aria-label={`Theme: ${theme}. Switch to ${NEXT_THEME[theme]}`}
-      title={`Theme: ${theme}`}
-    >
+    <button className="icon-btn" onClick={openAppearance} aria-label="Appearance" title="Appearance">
       {THEME_ICON[theme]}
     </button>
   );
@@ -94,7 +100,7 @@ function TopBar() {
           </div>
           <div className="topbar-actions">
             {pathname === '/ledger' && <MonthPill />}
-            <ThemeButton />
+            <AppearanceButton />
           </div>
         </div>
       </header>
@@ -147,7 +153,7 @@ const NAV = [
 
 function Nav() {
   return (
-    <nav className="nav" aria-label="Main">
+    <nav className="nav" aria-label="Main" data-tour="nav">
       {NAV.map(([to, label, Icon]) => (
         <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}>
           <span className="nav-ico"><Icon /></span>
@@ -204,7 +210,19 @@ class ErrorBoundary extends Component {
 }
 
 function Shell() {
-  const { addSheet, openAdd, toast, monthSheet, splitSheet } = useStore();
+  const {
+    addSheet, openAdd, toast, monthSheet, splitSheet, settings, tour, startTour,
+    appearance, closeAppearance,
+  } = useStore();
+  const { user } = useAuth();
+  /* Asked of the ledger rather than of this device — see lib/onboarding.js.
+     'unknown' while it is deciding, so neither greeting flashes up first. */
+  const firstRun = useFirstRun(user, settings);
+
+  /* A new account is started on the tour automatically; Settings can start the
+     same one by hand. Either way `tour` is what decides whether it is running,
+     so there is only one thing to reason about. */
+  useEffect(() => { if (firstRun === 'tour') startTour({ fresh: true }); }, [firstRun]);   // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="app">
       <ScrollTop />
@@ -224,17 +242,22 @@ function Shell() {
         </ErrorBoundary>
       </main>
 
-      <button className="fab" onClick={() => openAdd({})} aria-label="Add entry">
+      <button className="fab" data-tour="add" onClick={() => openAdd({})} aria-label="Add entry">
         <IconPlus />
         <span className="fab-label">Add</span>
       </button>
       <Nav />
 
-      <WhatsNew />
+      {/* Mutually exclusive on purpose: a brand-new account gets the tour, and
+          release notes for versions it was never around for would be noise on
+          top of it. Everyone else gets the notes as before. */}
+      {tour && <Tour />}
+      {firstRun === 'none' && !tour && <WhatsNew />}
 
       {addSheet && <AddSheet key={addSheet.tx?._id || addSheet.kind || 'new'} />}
       {splitSheet && <SplitSheet key={splitSheet.groupId || 'new-split'} />}
       {monthSheet && <MonthSheet />}
+      {appearance && <AppearanceSheet onClose={closeAppearance} />}
       {toast && (
         <div className="toast" role="status">
           <span className="toast-ico"><IconCheck /></span>{toast}
@@ -271,6 +294,9 @@ export default function App() {
         {/* Public: a privacy policy you can only read once you have handed over
             your details is no use, and Google's consent screen must reach it. */}
         <Route path="/privacy-policy" element={<Privacy />} />
+        {/* Also public, and for the same reason: whoever follows a reset link
+            cannot sign in, so putting it behind the gate would be a closed loop. */}
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route
           path="*"
           element={(

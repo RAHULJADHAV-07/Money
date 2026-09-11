@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 import { api, getToken } from '../lib/api.js';
 import { useApi, useStore } from '../lib/store.jsx';
 import { useAuth } from '../lib/auth.jsx';
-import { useTheme, THEMES } from '../lib/theme.js';
 import { money, dayLabel } from '../lib/format.js';
 import { KINDS } from '../lib/kinds.js';
 import {
-  IconSun, IconMoon, IconAuto, IconDownload, IconLogout, IconClose, IconPlus,
+  IconDownload, IconLogout, IconClose, IconPlus,
   IconWallet, IconTag, IconTarget, IconUser, IconInfo, IconSavings, IconChevronRight,
+  IconSpark,
 } from '../components/Icons.jsx';
 import SignInMethods from '../components/SignInMethods.jsx';
 import RoutineSheet from '../components/RoutineSheet.jsx';
@@ -18,7 +18,6 @@ const CADENCE_LABEL = {
   yearly: 'Every year', anytime: 'Whenever',
 };
 
-const THEME_ICON = { system: <IconAuto />, light: <IconSun />, dark: <IconMoon /> };
 
 /* A routine's date range, said the way you would say it out loud, and only when
    it has one -- most do not. `active` is false while today sits outside it,
@@ -97,9 +96,8 @@ function NumberRow({ label, value, onChange, currency }) {
 }
 
 export default function Settings() {
-  const { settings, refresh, notify } = useStore();
+  const { settings, refresh, notify, startTour } = useStore();
   const { user, signOut } = useAuth();
-  const [theme, setTheme] = useTheme();
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(null);   // {} for a new routine, the routine for an edit
@@ -163,20 +161,7 @@ export default function Settings() {
 
   return (
     <div className={`page ${dirty ? 'page--savebar' : ''}`}>
-      <div className="card">
-        <div className="card-head"><h2 className="card-title">Appearance</h2></div>
-        <div className="theme-picker">
-          {THEMES.map((t) => (
-            <button key={t} className="theme-opt" aria-pressed={theme === t} onClick={() => setTheme(t)}>
-              <span className={`theme-swatch theme-swatch--${t}`} aria-hidden="true" />
-              <span className="theme-opt-ico">{THEME_ICON[t]}</span>
-              <span className="theme-opt-label">{t}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="card">
+      <div className="card" data-tour="opening">
         <div className="card-head">
           <h2 className="card-title"><span className="card-ico"><IconWallet /></span>Wallets</h2>
           <span className="card-sub num">{money(openingTotal, draft.currency)} opening</span>
@@ -257,6 +242,21 @@ export default function Settings() {
         </span>
         <IconChevronRight />
       </Link>
+
+      {/* The same tour a new account is started on. Kept reachable on purpose:
+          it is the only place that explains why an entry can be refused for
+          want of an opening balance, and anyone who skipped it — or who was
+          already a user when it was added — would otherwise never see it. */}
+      {/* Wrapped, not passed by reference: startTour takes options, and the
+          click event would arrive as them. */}
+      <button type="button" className="card card--link" onClick={() => startTour()}>
+        <span className="card-ico"><IconSpark /></span>
+        <span className="cardlink-body">
+          <b>Take the guided tour</b>
+          <span>A walk through all five screens, starting with your wallets. Leave it at any point.</span>
+        </span>
+        <IconChevronRight />
+      </button>
 
       <div className="card">
         <div className="card-head"><h2 className="card-title"><span className="card-ico"><IconUser /></span>Account</h2></div>
