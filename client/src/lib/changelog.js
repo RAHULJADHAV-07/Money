@@ -10,6 +10,16 @@ import { isNewer } from './version.js';
 
 export const CHANGELOG = [
   {
+    version: '2.2.0',
+    title: 'A proper welcome, a way back in, and colours that agree with each other',
+    changes: [
+      'New here? The app now walks you through it in five steps, and the last one asks what is already in each of your wallets. That matters more than it sounds: an entry that would take a wallet below zero is refused, so starting at zero meant your very first expense was turned away with no explanation. You can skip the whole thing.',
+      'Forgotten your password? There is a link on the sign-in screen now. It emails you a link that works for 45 minutes and only once, and signs you in as soon as you have chosen a new one.',
+      'Splitting something now asks what happened first — a bill you shared, money that came to you, or money you paid out. The shared-bill option was previously buried behind a link almost nobody found, so the prompt that asked "was this a bill you shared?" could not actually get you there. Whatever you had already typed follows you in.',
+      'The colours have been rebuilt around the green. The wallet cards were a navy, a purple and a magenta that belonged to no scheme; savings was a primary blue; the calendar ran on blues. All of it is now one family of greens, teals and deep sea tones. Two of those old wallet colours were also indistinguishable to anyone red-green colour-blind, which is fixed.',
+    ],
+  },
+  {
     version: '2.1.1',
     title: 'A simpler way to add, and balances where you pick a wallet',
     changes: [

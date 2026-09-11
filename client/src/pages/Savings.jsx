@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../lib/api.js';
+import { GOAL_COLORS } from '../lib/palette.js';
 import { useApi, useStore } from '../lib/store.jsx';
 import { money, moneyParts } from '../lib/format.js';
 import Sheet from '../components/Sheet.jsx';
@@ -7,7 +8,8 @@ import Alert from '../components/Alert.jsx';
 import { Ring } from '../components/Charts.jsx';
 import { IconTarget, IconPlus, IconTrash, IconCheck } from '../components/Icons.jsx';
 
-const COLORS = ['#0e9f6e', '#2a6fe0', '#e2622f', '#6d4aca', '#c98a00', '#d1569a', '#0f766e', '#d8453f'];
+// One source of truth: the same family the charts and wallet cards draw from.
+const COLORS = GOAL_COLORS;
 
 function GoalSheet({ goal, onClose }) {
   const { refresh, notify, currency } = useStore();

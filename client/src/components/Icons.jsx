@@ -87,6 +87,9 @@ export const IconCloudOff = () => (
 export const IconSync = () => (
   <Icon><path d="M20 11.4A8 8 0 0 0 6.3 6.3L4 8.6" /><path d="M4 4.6v4h4" /><path d="M4 12.6A8 8 0 0 0 17.7 17.7L20 15.4" /><path d="M20 19.4v-4h-4" /></Icon>
 );
+export const IconMail = () => (
+  <Icon><rect x="2.8" y="5.2" width="18.4" height="13.6" rx="2.6" /><path d="m3.6 7 8.4 6 8.4-6" /></Icon>
+);
 export const IconUser = () => <Icon><circle cx="12" cy="8.4" r="3.8" /><path d="M4.8 20.2c0-3.7 3.2-6.1 7.2-6.1s7.2 2.4 7.2 6.1" /></Icon>;
 
 /* Show / hide what you are typing into a password box. The struck-through eye

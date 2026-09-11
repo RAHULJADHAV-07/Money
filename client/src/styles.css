@@ -31,7 +31,7 @@
   /* ── Meaning ──────────────────────────────────────────────────────────── */
   --in:     #0e9f6e;   /* money arriving */
   --out:    #e2622f;   /* money leaving  */
-  --save:   #2a6fe0;   /* set aside / magnitude */
+  --save:   #10707e;   /* set aside / magnitude */
   --warn:   #c07d00;
   --danger: #d8453f;
   --flat:   #7d8a84;   /* nothing moved  */
@@ -49,20 +49,20 @@
   /* Sequential blue ramp — magnitude only (calendar heat). Deliberately not the
      in/out pair, so "a lot" is never confused with "good" or "bad". */
   --heat-0: #eef1ee;
-  --heat-1: #d5e5fb;
-  --heat-2: #a8c9f4;
-  --heat-3: #6aa1e8;
-  --heat-4: #2a6fe0;
-  --heat-5: #1a4fa8;
+  --heat-1: #73c3cc;
+  --heat-2: #36a3a8;
+  --heat-3: #138487;
+  --heat-4: #0a6063;
+  --heat-5: #053f42;
   --heat-ink: #ffffff;
 
   /* Hero gradients */
   --hero-a: #0f8a63;
   --hero-b: #0a6349;
   --hero-c: #064334;
-  --hero-save-a: #3a7ce8;
-  --hero-save-b: #2258b8;
-  --hero-save-c: #17408d;
+  --hero-save-a: #17838f;
+  --hero-save-b: #0e6270;
+  --hero-save-c: #08454f;
 
   /* ── Shape ────────────────────────────────────────────────────────────── */
   --r-xs: 8px;
@@ -107,7 +107,7 @@
 
     --in:     #2fb98a;
     --out:    #f0743f;
-    --save:   #5b9bff;
+    --save:   #35b8c4;
     --warn:   #dfa72b;
     --danger: #f0625c;
     --flat:   #74827c;
@@ -122,19 +122,19 @@
     --grid-strong: #2c3630;
 
     --heat-0: #171d1a;
-    --heat-1: #16304f;
-    --heat-2: #1d4a83;
-    --heat-3: #2a6fc4;
-    --heat-4: #4a91f0;
-    --heat-5: #93c0fa;
-    --heat-ink: #071120;
+    --heat-1: #0f3a3c;
+    --heat-2: #12595a;
+    --heat-3: #17827f;
+    --heat-4: #28aca4;
+    --heat-5: #6cdad0;
+    --heat-ink: #06201f;
 
     --hero-a: #0f8a63;
     --hero-b: #0a5f47;
     --hero-c: #063f31;
-    --hero-save-a: #3273d8;
-    --hero-save-b: #204f9f;
-    --hero-save-c: #14356f;
+    --hero-save-a: #2a96a4;
+    --hero-save-b: #16646f;
+    --hero-save-c: #0d454d;
 
     --e1: 0 1px 2px rgba(0, 0, 0, .55);
     --e2: 0 2px 6px rgba(0, 0, 0, .5), 0 14px 30px -18px rgba(0, 0, 0, .85);
@@ -157,7 +157,7 @@
   --ink-3: #74827c;
   --in:     #2fb98a;
   --out:    #f0743f;
-  --save:   #5b9bff;
+  --save:   #35b8c4;
   --warn:   #dfa72b;
   --danger: #f0625c;
   --flat:   #74827c;
@@ -169,18 +169,18 @@
   --grid: #202824;
   --grid-strong: #2c3630;
   --heat-0: #171d1a;
-  --heat-1: #16304f;
-  --heat-2: #1d4a83;
-  --heat-3: #2a6fc4;
-  --heat-4: #4a91f0;
-  --heat-5: #93c0fa;
-  --heat-ink: #071120;
+  --heat-1: #0f3a3c;
+  --heat-2: #12595a;
+  --heat-3: #17827f;
+  --heat-4: #28aca4;
+  --heat-5: #6cdad0;
+  --heat-ink: #06201f;
   --hero-a: #0f8a63;
   --hero-b: #0a5f47;
   --hero-c: #063f31;
-  --hero-save-a: #3273d8;
-  --hero-save-b: #204f9f;
-  --hero-save-c: #14356f;
+  --hero-save-a: #2a96a4;
+  --hero-save-b: #16646f;
+  --hero-save-c: #0d454d;
   --e1: 0 1px 2px rgba(0, 0, 0, .55);
   --e2: 0 2px 6px rgba(0, 0, 0, .5), 0 14px 30px -18px rgba(0, 0, 0, .85);
   --e3: 0 10px 22px rgba(0, 0, 0, .55), 0 34px 60px -24px rgba(0, 0, 0, .9);
@@ -1407,6 +1407,29 @@ select.input option {
 .auth-sub { font-size: 13.5px; color: var(--ink-2); margin: 6px 0 20px; line-height: 1.5; }
 .auth-tabs { margin-bottom: 20px; }
 .auth-foot { font-size: 13px; color: var(--ink-3); text-align: center; margin-top: 18px; }
+
+/* ── Forgotten password ────────────────────────────────────────────────────
+   "Forgot password?" needs no markup of its own to sit opposite its label:
+   .field-label is already a flex row with space between them.               */
+.field-link { font-size: 11.5px; font-weight: 620; }
+
+/* The mark on a card that is reporting something rather than asking for it —
+   the link is sent, the password is changed, the link was incomplete. */
+.auth-sent-ico {
+  display: grid; place-items: center;
+  width: 46px; height: 46px; margin: 2px auto 14px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--in) var(--tint), var(--surface));
+  color: var(--in);
+}
+.auth-sent-ico svg { width: 22px; height: 22px; }
+.auth-sent-ico--warn {
+  background: color-mix(in oklab, var(--warn) var(--tint), var(--surface));
+  color: var(--warn);
+}
+/* The reset page has no pitch panel beside it, so its card centres alone and
+   keeps the mark that the two-column layout hides. */
+.auth-panel--solo { max-width: 420px; }
 .linkish { color: var(--in); font-weight: 650; font-size: 13px; }
 
 .pw-wrap { position: relative; }
@@ -1462,6 +1485,9 @@ select.input option {
   .auth-panel { max-width: 940px; grid-template-columns: 1fr 400px; align-items: center; gap: 48px; }
   .auth-pitch { display: block; }
   .auth-mark--sm { display: none; }
+  /* ...except on the reset card, which has no pitch panel to carry the mark. */
+  .auth-panel--solo { grid-template-columns: minmax(0, 420px); justify-content: center; }
+  .auth-panel--solo .auth-mark--sm { display: grid; }
 }
 
 /* ═══ Desktop — the bottom bar becomes a rail ══════════════════════════════ */
@@ -1758,6 +1784,11 @@ select.input option {
    once, at the bottom, as sentences to check rather than terms to choose.    */
 
 .shapes { display: grid; gap: 9px; }
+/* What the add sheet is handing over. Without it, choosing a shape looks like
+   it might discard the amount already typed. */
+.shapes-carry {
+  margin: -2px 0 12px; font-size: 12.5px; font-weight: 560; color: var(--ink-2);
+}
 .shape {
   display: flex; align-items: center; gap: 12px; width: 100%;
   padding: 14px 14px; text-align: left; border-radius: var(--r-md);
@@ -2014,6 +2045,112 @@ select.input option {
 .kindmore:hover {
   color: var(--ink); border-color: var(--ink-3);
   background: var(--surface-2); border-style: solid;
+}
+
+/* ── First run ─────────────────────────────────────────────────────────────
+   Full-screen rather than a sheet: this is the only thing happening, and a
+   sheet implies something underneath worth going back to — on a brand-new
+   account there is nothing there yet. The app is blurred behind it so it still
+   reads as the app rather than a separate installer.                        */
+.tour {
+  position: fixed; inset: 0; z-index: 95;
+  display: grid; place-items: center;
+  padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  background: color-mix(in oklab, var(--canvas) 82%, #000);
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+  animation: fade .24s var(--ease);
+  overflow-y: auto;
+}
+.tour-card {
+  width: min(440px, 100%);
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-xl); padding: 20px 22px 18px;
+  box-shadow: var(--e3), var(--card-edge);
+  animation: dialog-in .3s var(--ease);
+}
+.tour-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tour-count {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.tour-skip { font-size: 12.5px; font-weight: 600; color: var(--ink-3); padding: 4px 2px; }
+.tour-skip:hover { color: var(--ink-2); }
+
+.tour-ico {
+  display: grid; place-items: center;
+  width: 52px; height: 52px; margin: 16px 0 14px;
+  border-radius: 17px;
+  background: linear-gradient(150deg, var(--hero-a), var(--hero-c));
+  color: #fff; box-shadow: var(--e2);
+}
+.tour-ico svg { width: 24px; height: 24px; }
+.tour-title { font-size: 22px; font-weight: 720; letter-spacing: -.035em; line-height: 1.2; }
+.tour-body { margin: 9px 0 0; font-size: 14px; line-height: 1.62; color: var(--ink-2); }
+/* The reason a step matters, when the reason is not obvious from the step. */
+.tour-why {
+  margin: 14px 0 0; padding: 11px 13px;
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--in) var(--tint), var(--surface));
+  font-size: 12.5px; line-height: 1.55; color: var(--ink-2);
+}
+.tour-points { margin: 16px 0 0; padding: 0; display: grid; gap: 10px; }
+.tour-points li {
+  list-style: none; display: flex; gap: 10px; align-items: flex-start;
+  font-size: 13.5px; line-height: 1.5; color: var(--ink-2);
+}
+.tour-points b { color: var(--ink); font-weight: 640; }
+.tour-tick {
+  width: 19px; height: 19px; flex: none; margin-top: 1px;
+  border-radius: 50%; display: grid; place-items: center;
+  background: color-mix(in oklab, var(--in) var(--tint-strong), var(--surface));
+  color: var(--in);
+}
+.tour-tick svg { width: 12px; height: 12px; }
+
+/* The last step: one row per wallet, label and amount on one line so four of
+   them still fit above the fold on a phone. */
+.tour-wallets { margin: 16px 0 0; display: grid; gap: 8px; }
+.tour-wallet {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 9px 12px; border-radius: var(--r-sm);
+  background: var(--surface-2); border: 1px solid var(--line);
+}
+.tour-wallet-n { font-size: 13.5px; font-weight: 620; }
+.tour-wallet-in { display: flex; align-items: baseline; gap: 4px; }
+.tour-wallet-cur { font-size: 13px; color: var(--ink-3); font-weight: 600; }
+.tour-wallet-in input {
+  width: 104px; text-align: right; border: 0; background: transparent;
+  font-size: 16px; font-weight: 680; letter-spacing: -.02em; color: var(--ink);
+  padding: 2px 0;
+}
+.tour-wallet-in input:focus { outline: none; }
+.tour-wallet:focus-within { border-color: var(--in); background: var(--surface); }
+.tour-wallet-in input::-webkit-outer-spin-button,
+.tour-wallet-in input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.tour-wallet-in input[type='number'] { -moz-appearance: textfield; }
+.tour-total {
+  margin: 12px 0 0; font-size: 12.5px; font-weight: 600;
+  color: var(--ink-3); text-align: right;
+}
+
+.tour-foot {
+  margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+}
+.tour-dots { display: flex; gap: 6px; }
+.tour-dots i {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--line-2);
+  transition: background .18s var(--ease), width .18s var(--ease);
+}
+.tour-dots i.on { width: 18px; border-radius: var(--r-pill); background: var(--in); }
+.tour-actions { display: flex; align-items: center; gap: 8px; }
+.tour-back { padding: 10px 12px; }
+.tour-back svg { width: 16px; height: 16px; display: block; }
+.tour-next { padding: 11px 22px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tour, .tour-card { animation-duration: .01ms; }
+  .tour-dots i { transition: none; }
 }
 
 /* ── Updating ──────────────────────────────────────────────────────────────

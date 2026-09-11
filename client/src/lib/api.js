@@ -123,6 +123,10 @@ export const auth = {
   google: (credential) => raw('/auth/google', { method: 'POST', body: { credential }, skipAuthRedirect: true }),
   disconnectGoogle: () => raw('/auth/google', { method: 'DELETE' }),
   setPassword: (body) => raw('/auth/password', { method: 'PUT', body }),
+  /* Both unauthenticated by nature -- whoever needs them cannot sign in. The
+     first answers the same way whether or not the address has an account. */
+  forgot: (email) => raw('/auth/forgot', { method: 'POST', body: { email }, skipAuthRedirect: true }),
+  reset: (body) => raw('/auth/reset', { method: 'POST', body, skipAuthRedirect: true }),
 };
 
 export const api = {

@@ -13,6 +13,8 @@ import AddSheet from './components/AddSheet.jsx';
 import SplitSheet from './components/SplitSheet.jsx';
 import UpdateGate from './components/UpdateGate.jsx';
 import WhatsNew from './components/WhatsNew.jsx';
+import FirstRun from './components/FirstRun.jsx';
+import { isFirstRun } from './lib/onboarding.js';
 import MonthSheet from './components/MonthSheet.jsx';
 import Home from './pages/Home.jsx';
 import Transactions from './pages/Transactions.jsx';
@@ -20,6 +22,7 @@ import People from './pages/People.jsx';
 import Savings from './pages/Savings.jsx';
 import Settings from './pages/Settings.jsx';
 import Privacy from './pages/Privacy.jsx';
+import ResetPassword from './pages/ResetPassword.jsx';
 import { monthLabel, monthShort, shiftMonth, monthKeyNow, dayLabel } from './lib/format.js';
 
 const TITLES = {
@@ -230,7 +233,10 @@ function Shell() {
       </button>
       <Nav />
 
-      <WhatsNew />
+      {/* Mutually exclusive on purpose: a first-ever visit gets the tour, and
+          release notes for a version they have never run would be noise on top
+          of it. Everyone else gets the notes as before. */}
+      {isFirstRun() ? <FirstRun /> : <WhatsNew />}
 
       {addSheet && <AddSheet key={addSheet.tx?._id || addSheet.kind || 'new'} />}
       {splitSheet && <SplitSheet key={splitSheet.groupId || 'new-split'} />}
@@ -271,6 +277,9 @@ export default function App() {
         {/* Public: a privacy policy you can only read once you have handed over
             your details is no use, and Google's consent screen must reach it. */}
         <Route path="/privacy-policy" element={<Privacy />} />
+        {/* Also public, and for the same reason: whoever follows a reset link
+            cannot sign in, so putting it behind the gate would be a closed loop. */}
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route
           path="*"
           element={(
