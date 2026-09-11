@@ -95,7 +95,7 @@ export default function Transactions() {
         <FlowBar inAmount={got} outAmount={spent} />
       </div>
 
-      <div className="searchbar">
+      <div className="searchbar" data-tour="search">
         <IconSearch />
         <input
           className="searchbar-input"
@@ -109,7 +109,7 @@ export default function Transactions() {
         )}
       </div>
 
-      <div className="filters">
+      <div className="filters" data-tour="filters">
         <div className="field">
           <label className="field-label" htmlFor="f-kind">Type of entry</label>
           <select id="f-kind" className="input" value={kind} onChange={(e) => setKind(e.target.value)}>

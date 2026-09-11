@@ -2153,6 +2153,90 @@ select.input option {
   .tour-dots i { transition: none; }
 }
 
+/* ── Guided tour ───────────────────────────────────────────────────────────
+   A walk through the real screens, so the dimming has to be a hole rather than
+   a sheet. `box-shadow` spread does that in one element: the box itself stays
+   clear and the shadow floods everything outside it. No clip-path, no second
+   layer, and it animates as one thing when the highlight moves on.
+
+   Pointer events are off throughout — the screen underneath is live, which is
+   what lets someone type their opening balances during the step about opening
+   balances.                                                                  */
+.tr-hole, .tr-dim {
+  position: fixed; z-index: 96; pointer-events: none;
+  animation: fade .2s var(--ease);
+}
+.tr-hole {
+  border-radius: var(--r-md);
+  /* The dim MUST carry alpha. color-mix of two opaque colours is opaque, so
+     mixing the canvas with black gives a solid sheet that hides the very screen
+     this is supposed to be showing off. Matched to .scrim, a little heavier. */
+  box-shadow:
+    0 0 0 9999px rgba(6, 10, 8, .68),
+    0 0 0 2px color-mix(in oklab, var(--in) 70%, transparent),
+    0 0 26px 2px color-mix(in oklab, var(--in) 34%, transparent);
+  transition: top .28s var(--ease), left .28s var(--ease),
+              width .28s var(--ease), height .28s var(--ease);
+}
+/* No element to point at — the step still has something to say. */
+.tr-dim {
+  inset: 0;
+  background: rgba(6, 10, 8, .68);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+}
+
+.tr-card {
+  position: fixed; z-index: 97;
+  width: min(340px, calc(100vw - 24px));
+  padding: 15px 17px 13px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--e3), var(--card-edge);
+  animation: fade .22s var(--ease);
+  transition: top .28s var(--ease), left .28s var(--ease);
+}
+.tr-card--centre { width: min(400px, calc(100vw - 32px)); transition: none; }
+
+.tr-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tr-count {
+  font-size: 10px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--in);
+}
+.tr-skip { font-size: 12px; font-weight: 600; color: var(--ink-3); padding: 3px 1px; }
+.tr-skip:hover { color: var(--ink-2); }
+
+.tr-title {
+  margin: 9px 0 0; font-size: 17px; font-weight: 700;
+  letter-spacing: -.03em; line-height: 1.25;
+}
+.tr-body { margin: 6px 0 0; font-size: 13px; line-height: 1.6; color: var(--ink-2); }
+.tr-why {
+  margin: 11px 0 0; padding: 9px 11px; border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--in) var(--tint), var(--surface));
+  font-size: 12px; line-height: 1.55; color: var(--ink-2);
+}
+
+.tr-foot {
+  margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.tr-dots { display: flex; gap: 4px; flex-wrap: wrap; max-width: 120px; }
+.tr-dots i {
+  width: 5px; height: 5px; border-radius: 50%; background: var(--line-2);
+  transition: background .18s var(--ease), width .18s var(--ease);
+}
+.tr-dots i.on { width: 15px; border-radius: var(--r-pill); background: var(--in); }
+.tr-actions { display: flex; align-items: center; gap: 7px; }
+.tr-back { padding: 8px 10px; }
+.tr-back svg { width: 15px; height: 15px; display: block; }
+.tr-next { padding: 9px 18px; font-size: 13.5px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tr-hole, .tr-card { transition: none; animation-duration: .01ms; }
+  .tr-dots i { transition: none; }
+}
+
 /* ── Updating ──────────────────────────────────────────────────────────────
    A new version is about to be swapped in. Brief and unmissable, so the reload
    that follows reads as the app doing something rather than as a glitch.     */

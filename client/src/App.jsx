@@ -13,8 +13,8 @@ import AddSheet from './components/AddSheet.jsx';
 import SplitSheet from './components/SplitSheet.jsx';
 import UpdateGate from './components/UpdateGate.jsx';
 import WhatsNew from './components/WhatsNew.jsx';
-import FirstRun from './components/FirstRun.jsx';
-import { isFirstRun } from './lib/onboarding.js';
+import Tour from './components/Tour.jsx';
+import { useFirstRun } from './lib/onboarding.js';
 import MonthSheet from './components/MonthSheet.jsx';
 import Home from './pages/Home.jsx';
 import Transactions from './pages/Transactions.jsx';
@@ -150,7 +150,7 @@ const NAV = [
 
 function Nav() {
   return (
-    <nav className="nav" aria-label="Main">
+    <nav className="nav" aria-label="Main" data-tour="nav">
       {NAV.map(([to, label, Icon]) => (
         <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}>
           <span className="nav-ico"><Icon /></span>
@@ -207,7 +207,11 @@ class ErrorBoundary extends Component {
 }
 
 function Shell() {
-  const { addSheet, openAdd, toast, monthSheet, splitSheet } = useStore();
+  const { addSheet, openAdd, toast, monthSheet, splitSheet, settings } = useStore();
+  const { user } = useAuth();
+  /* Asked of the ledger rather than of this device — see lib/onboarding.js.
+     'unknown' while it is deciding, so neither greeting flashes up first. */
+  const firstRun = useFirstRun(user, settings);
   return (
     <div className="app">
       <ScrollTop />
@@ -227,16 +231,17 @@ function Shell() {
         </ErrorBoundary>
       </main>
 
-      <button className="fab" onClick={() => openAdd({})} aria-label="Add entry">
+      <button className="fab" data-tour="add" onClick={() => openAdd({})} aria-label="Add entry">
         <IconPlus />
         <span className="fab-label">Add</span>
       </button>
       <Nav />
 
-      {/* Mutually exclusive on purpose: a first-ever visit gets the tour, and
-          release notes for a version they have never run would be noise on top
-          of it. Everyone else gets the notes as before. */}
-      {isFirstRun() ? <FirstRun /> : <WhatsNew />}
+      {/* Mutually exclusive on purpose: a brand-new account gets the tour, and
+          release notes for versions it was never around for would be noise on
+          top of it. Everyone else gets the notes as before. */}
+      {firstRun === 'tour' && <Tour />}
+      {firstRun === 'none' && <WhatsNew />}
 
       {addSheet && <AddSheet key={addSheet.tx?._id || addSheet.kind || 'new'} />}
       {splitSheet && <SplitSheet key={splitSheet.groupId || 'new-split'} />}

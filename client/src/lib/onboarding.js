@@ -1,40 +1,66 @@
+import { useEffect, useState } from 'react';
+import { api } from './api.js';
+
 /*
- * Whether this is somebody's first time in the app.
+ * Whether this account has ever been used.
  *
- * Resolved once, when this module is first imported, and deliberately not
- * later: WhatsNew stamps `hisab.version.seen` the moment it mounts, and that
- * stamp is the very thing used below to recognise an established user. Deciding
- * inside an effect would make the answer depend on which component rendered
- * first, which is not a thing to build a first impression on.
+ * The question is about the *account*, not the browser, and getting that wrong
+ * is what broke the first version of this: it keyed off `hisab.version.seen`,
+ * which any returning device carries regardless of who is signed in. Anyone who
+ * had used the app before and then made a fresh account was treated as an old
+ * hand and shown nothing — which is precisely the person the tour exists for.
+ *
+ * So the signal comes from the ledger instead: an account with no entries and
+ * no opening balances has never been used, whatever the device remembers. That
+ * also settles the mirror case for free — an established user on a brand-new
+ * phone has data, so they are left alone.
+ *
+ * Only the dismissal is stored locally, and it is stored per account, so two
+ * people sharing a browser do not inherit each other's answer.
  */
 
-const KEY = 'hisab.onboarded.v1';
-// Written by WhatsNew on every launch since 2.0.0, so its presence means this
-// device has opened an earlier release and needs no tour.
-const SEEN_KEY = 'hisab.version.seen';
+const keyFor = (userId) => `hisab.onboarded.${userId}`;
 
 const read = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const write = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
 
-function resolve() {
-  /* No storage at all — a locked-down private window. Guessing "first run"
-     would mean showing the tour on every single launch, which is worse than
-     never showing it. */
-  try { if (typeof localStorage === 'undefined') return false; } catch { return false; }
+/** `how` rather than a bare flag — worth knowing whether they skipped. */
+export const markOnboarded = (userId, how = 'done') => write(keyFor(userId), how);
 
-  if (read(KEY)) return false;
-  if (read(SEEN_KEY)) {
-    // Already a user of an earlier release; record it so this is settled once.
-    write(KEY, 'established');
-    return false;
-  }
-  return true;
+const dismissed = (userId) => !!read(keyFor(userId));
+
+/**
+ * 'unknown' until the ledger has answered, then 'tour' or 'none'.
+ *
+ * Three states rather than a boolean because the caller has to show neither the
+ * tour nor the release notes while it is still deciding — one or the other
+ * flashing up and being replaced is worse than a moment of nothing.
+ */
+export function useFirstRun(user, settings) {
+  const [state, setState] = useState('unknown');
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    /* Decided once and then left alone. `settings` is replaced after every
+       write, so without this the question would be re-asked mid-tour — and the
+       moment someone logged their first entry the answer would flip and the
+       tour would vanish out from under them. */
+    if (state !== 'unknown') return undefined;
+    if (dismissed(user.id)) { setState('none'); return undefined; }
+
+    // An opening balance is itself proof of having been set up.
+    const opened = Object.values(settings?.openingBalances || {}).some((v) => Number(v) > 0);
+    if (opened) { setState('none'); return undefined; }
+
+    let alive = true;
+    /* One row is all it takes to know: `total` comes back with the page, so the
+       cheapest possible request answers the question. */
+    api.transactions({ limit: 1 })
+      .then((r) => alive && setState((r?.total ?? 0) === 0 ? 'tour' : 'none'))
+      // A failed probe must not greet someone with a tour they do not need.
+      .catch(() => alive && setState('none'));
+    return () => { alive = false; };
+  }, [user?.id, settings, state]);
+
+  return state;
 }
-
-const FIRST_RUN = resolve();
-
-/** True only for a genuinely new install, and constant for the whole session. */
-export const isFirstRun = () => FIRST_RUN;
-
-/** `how` is kept rather than a bare flag — useful to know if they skipped. */
-export const markOnboarded = (how = 'done') => write(KEY, how);

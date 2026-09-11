@@ -125,7 +125,7 @@ export default function People() {
 
   return (
     <div className="page">
-      <div className="card">
+      <div className="card" data-tour="people">
         <div className="card-head">
           <h2 className="card-title">Your position</h2>
           <span className={`badge ${net >= 0 ? 'badge--in' : 'badge--out'}`}>

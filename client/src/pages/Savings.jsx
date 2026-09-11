@@ -120,7 +120,7 @@ export default function Savings() {
 
   return (
     <div className="page">
-      <section className="hero hero--save hero--inset">
+      <section className="hero hero--save hero--inset" data-tour="savings">
         <div className="hero-top">
           <span className="hero-label">Total saved</span>
           <span className="hero-chip hero-chip--static">

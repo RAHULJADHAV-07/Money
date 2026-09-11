@@ -176,7 +176,7 @@ export default function Settings() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card" data-tour="opening">
         <div className="card-head">
           <h2 className="card-title"><span className="card-ico"><IconWallet /></span>Wallets</h2>
           <span className="card-sub num">{money(openingTotal, draft.currency)} opening</span>
