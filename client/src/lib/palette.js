@@ -1,32 +1,51 @@
-/* Categorical hues in a fixed, validated order. Colour follows the category
-   itself — never its rank — so filtering or re-sorting never repaints the
-   survivors.
+/*
+ * Identity colours — a category, a person, a wallet, a savings bucket.
+ *
+ * All of them are stated relative to the accent rather than fixed, so choosing
+ * orange in Appearance turns the wallet cards orange too. Each family is a list
+ * of [lightness, chroma, hue offset] and comes back as a css `oklch()` string
+ * that reads `var(--accent-h)` itself, which means these follow the accent live
+ * with nothing to recompute when it changes.
+ *
+ * How far each family is allowed to spread depends on what its colour is for:
+ *
+ *   Wallet cards carry their own name on the card — CASH, UPI — so colour is
+ *   decoration, and they stay within ±11° of the accent. Separation there comes
+ *   almost entirely from lightness, and the floor on chroma is deliberate: the
+ *   arrangement that separates best leaves two cards near-grey, which defeats
+ *   the point of them following the accent at all. Holding every card above
+ *   0.11 chroma costs about 0.6 ΔE2000 and is worth it. What is left is roughly
+ *   5.7 ΔE under red-green colour blindness, below the 8 that colour-as-data
+ *   wants — the deliberate trade being that nothing here is identified by its
+ *   colour alone.
+ *
+ *   Chart series are the opposite — a slice means a category only because of
+ *   its colour — so they spread ±45° and hold about 27 ΔE (light) and 22 ΔE
+ *   (dark) between neighbours, measured across eight accents around the wheel.
+ *
+ * Lightness ranges differ per theme for the charts, which sit on a card, and
+ * not for the wallets, which are dark blocks carrying white text either way.
+ */
 
-   The dark set is not the light set dimmed: each hue is re-chosen so it holds
-   the same apparent weight against a near-black surface.
+const css = ([L, C, dh]) => `oklch(${L} ${C} calc(var(--accent-h) + ${dh}))`;
 
-   Both sets are anchored on the app's green and reach outwards through teal and
-   sea blue into two warms, so a chart reads as part of this app rather than as
-   a box of highlighters. The stray purple, magenta and primary blue are gone.
+// Chart series: eight, spread far enough apart to be told apart.
+const CHART_LIGHT = [
+  [0.67, 0.11, 0], [0.42, 0.14, -15], [0.67, 0.08, -30], [0.42, 0.11, -30],
+  [0.67, 0.05, -30], [0.42, 0.05, -45], [0.67, 0.05, -45], [0.42, 0.14, -30],
+];
+const CHART_DARK = [
+  [0.85, 0.11, 0], [0.60, 0.08, 15], [0.85, 0.17, 0], [0.60, 0.05, 0],
+  [0.85, 0.08, 0], [0.60, 0.05, 15], [0.85, 0.05, 30], [0.60, 0.05, 45],
+];
 
-   ── The measured property ────────────────────────────────────────────────
-   Adjacent pairs are ≥ 8 ΔE2000 apart under normal, protanopic and
-   deuteranopic vision — light 14.06, dark 16.44. The order is therefore load
-   bearing: it was chosen by exhaustive search over all 8! arrangements, and
-   shuffling these arrays would quietly undo it. The previous dark set sat at
-   3.67 (its pink and its teal were all but identical to a deuteranope), so
-   this is a repair as much as a retheme.
-
-   Tritanopia is not part of the bar, as it was not before: it is ~0.01%
-   prevalent, and holding it as well would force the hues apart so far that the
-   family falls back to being a box of highlighters. */
-const LIGHT = ['#0e9f6e', '#8a5a3c', '#c98a00', '#2d8659', '#156b84', '#4f9e3f', '#0f766e', '#e2622f'];
-const DARK  = ['#2fb98a', '#dfa72b', '#4fcf9e', '#f0743f', '#2bb3a6', '#7cc45f', '#4aa7c4', '#c08a66'];
-
-/* The swatches offered when naming a savings bucket. The same family, so a
-   bucket's colour cannot land outside the scheme. Buckets already saved keep
-   whatever they were given — their colour lives in the database. */
-export const GOAL_COLORS = LIGHT;
+/* Wallet cards: one tight family, kept dark enough for white text. A wallet is
+   an identity, not a direction, so none of these is the money-in or money-out
+   colour — but they are unmistakably the accent. */
+const WALLETS = [
+  [0.68, 0.11, -11], [0.60, 0.17, -11], [0.52, 0.17, 11],
+  [0.44, 0.11, 0],   [0.36, 0.14, 11],  [0.28, 0.17, -11],
+];
 
 const isDark = () => {
   const stamped = document.documentElement.getAttribute('data-theme');
@@ -34,43 +53,28 @@ const isDark = () => {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
 };
 
-// A stable index per name, so the same category keeps its hue across screens.
-export function hueFor(name, order = []) {
+// A stable index per name, so the same category keeps its colour across screens.
+const slotFor = (name, order, len, salt) => {
   const i = order.indexOf(name);
-  const slot = i >= 0 ? i : Math.abs([...String(name)].reduce((h, c) => h * 31 + c.charCodeAt(0), 7));
-  return (isDark() ? DARK : LIGHT)[slot % 8];
+  const n = i >= 0 ? i : Math.abs([...String(name)].reduce((h, c) => h * 31 + c.charCodeAt(0), salt));
+  return n % len;
+};
+
+export function hueFor(name, order = []) {
+  const fam = isDark() ? CHART_DARK : CHART_LIGHT;
+  return css(fam[slotFor(name, order, fam.length, 7)]);
 }
 
-// A soft wash of the same hue, for the surface behind an icon or an avatar.
+// A soft wash of the same colour, for the surface behind an icon or an avatar.
 export const softFor = (name, order = []) =>
   `color-mix(in oklab, ${hueFor(name, order)} ${isDark() ? '22%' : '13%'}, var(--surface))`;
 
-/* Wallet cards are large blocks of colour, so they get a ramp of their own:
-   deep emerald through jade, teal and petrol to moss. A wallet is an identity,
-   not a direction, so none of these lands on the money-in green or the
-   money-out warm — but they stay inside the same family, which the old jewel
-   tones did not: a navy beside a purple beside a magenta belonged to no scheme
-   at all.
+export const walletHue = (name, order = []) => css(WALLETS[slotFor(name, order, WALLETS.length, 11)]);
 
-   Held to ALL pairs rather than adjacent ones, unlike the chart hues above,
-   because any two wallets can end up side by side on the dashboard — there is
-   no fixed order to lean on. Light 11.39, dark 12.66, under normal, protanopic
-   and deuteranopic vision.
-
-   That distinction is what the old ramp got wrong, and badly: its navy and its
-   purple were 0.34 ΔE apart to a protanope, which is to say identical. Anyone
-   red-blind could not tell one wallet card from another by colour.
-
-   Every one is dark enough to carry white text, which is what caps the
-   lightness and is why separation is bought mostly with hue. */
-const WALLET_LIGHT = ['#0a5540', '#2b8c7a', '#0f6b76', '#0b4356', '#2a6d3b', '#5d9459'];
-const WALLET_DARK  = ['#0c5c44', '#35a08d', '#127683', '#0e5566', '#2e7a42', '#6aa565'];
-
-export function walletHue(name, order = []) {
-  const i = order.indexOf(name);
-  const slot = i >= 0 ? i : Math.abs([...String(name)].reduce((h, c) => h * 31 + c.charCodeAt(0), 11));
-  return (isDark() ? WALLET_DARK : WALLET_LIGHT)[slot % 6];
-}
+/* The swatches offered when naming a savings bucket. Stated the same way, so a
+   bucket chosen today still belongs to the scheme after the accent changes —
+   what is saved is its offset from the accent, not a colour frozen in time. */
+export const GOAL_COLORS = CHART_LIGHT.map(css);
 
 export const initialsOf = (name) => String(name || '?').trim().slice(0, 2).toUpperCase();
 

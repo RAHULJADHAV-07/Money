@@ -49,9 +49,13 @@
   /* ── Meaning ──────────────────────────────────────────────────────────── */
   --in:     #0e9f6e;   /* money arriving */
   --out:    #e2622f;   /* money leaving  */
-  /* Savings sits 45° off the accent, so "set aside" never reads as the accent
-     itself while still belonging to whatever scheme is chosen. */
-  --save:   oklch(0.501 0.083 calc(var(--accent-h) + 45));
+  /* Savings sits a little off the accent — far enough that "set aside" is not
+     the accent exactly, near enough that it is plainly the same scheme. It was
+     45° and that was too far: at an amber accent it came out green, which is
+     precisely the thing an accent is supposed to stop happening. --save also
+     colours a good deal of ordinary chrome (action links, the day bar, the
+     checkboxes), so it cannot afford to wander. */
+  --save:   oklch(0.501 0.083 calc(var(--accent-h) + 15));
   --warn:   #c07d00;
   --danger: #d8453f;
   --flat:   #7d8a84;   /* nothing moved  */
@@ -85,9 +89,9 @@
   --hero-a: oklch(0.562 0.116 var(--accent-h));
   --hero-b: oklch(0.445 0.095 var(--accent-h));
   --hero-c: oklch(0.342 0.075 var(--accent-h));
-  --hero-save-a: oklch(0.560 0.078 calc(var(--accent-h) + 45));
-  --hero-save-b: oklch(0.440 0.064 calc(var(--accent-h) + 45));
-  --hero-save-c: oklch(0.340 0.052 calc(var(--accent-h) + 45));
+  --hero-save-a: oklch(0.560 0.078 calc(var(--accent-h) + 15));
+  --hero-save-b: oklch(0.440 0.064 calc(var(--accent-h) + 15));
+  --hero-save-c: oklch(0.340 0.052 calc(var(--accent-h) + 15));
 
   /* ── Shape ────────────────────────────────────────────────────────────── */
   --r-xs: 8px;
@@ -134,7 +138,7 @@
 
     --in:     #2fb98a;
     --out:    #f0743f;
-    --save:   oklch(0.719 0.110 calc(var(--accent-h) + 45));
+    --save:   oklch(0.719 0.110 calc(var(--accent-h) + 15));
     --warn:   #dfa72b;
     --danger: #f0625c;
     --flat:   oklch(0.593 calc(0.019 * var(--sf-c)) var(--accent-h));
@@ -183,7 +187,7 @@
 
   --in:     #2fb98a;
   --out:    #f0743f;
-  --save:   oklch(0.719 0.110 calc(var(--accent-h) + 45));
+  --save:   oklch(0.719 0.110 calc(var(--accent-h) + 15));
   --warn:   #dfa72b;
   --danger: #f0625c;
   --flat:   oklch(0.593 calc(0.019 * var(--sf-c)) var(--accent-h));
@@ -2194,6 +2198,9 @@ select.input option {
    miniatures rendered in their own preset's tokens, and the swatches are the
    accent at the lightness the app will actually use it at. Nothing is a label
    for a colour you cannot see.                                              */
+/* Inside a sheet now, not a card, so Reset needs its own line to sit on. */
+.ap-reset { display: flex; justify-content: flex-end; margin: -4px 0 10px; }
+
 .ap-label {
   display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
   font-size: 10.5px; font-weight: 700; letter-spacing: .07em;

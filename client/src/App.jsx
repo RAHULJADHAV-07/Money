@@ -1,4 +1,4 @@
-import { Component, useEffect } from 'react';
+import { Component, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { StoreProvider, useStore } from './lib/store.jsx';
 import { AuthProvider, useAuth } from './lib/auth.jsx';
@@ -14,6 +14,7 @@ import SplitSheet from './components/SplitSheet.jsx';
 import UpdateGate from './components/UpdateGate.jsx';
 import WhatsNew from './components/WhatsNew.jsx';
 import Tour from './components/Tour.jsx';
+import AppearanceSheet from './components/AppearanceSheet.jsx';
 import { useFirstRun } from './lib/onboarding.js';
 import MonthSheet from './components/MonthSheet.jsx';
 import Home from './pages/Home.jsx';
@@ -65,20 +66,26 @@ function MonthPill() {
   );
 }
 
-const NEXT_THEME = { system: 'light', light: 'dark', dark: 'system' };
 const THEME_ICON = { system: <IconAuto />, light: <IconSun />, dark: <IconMoon /> };
 
-function ThemeButton() {
-  const [theme, setTheme] = useTheme();
+/* Opens the whole Appearance panel rather than cycling the three modes. The
+   cycle was a smaller thing behind the same icon: three states you had to tap
+   through to find, with the accent and the surfaces nowhere near it. */
+function AppearanceButton() {
+  const [theme] = useTheme();
+  const [open, setOpen] = useState(false);
   return (
-    <button
-      className="icon-btn"
-      onClick={() => setTheme(NEXT_THEME[theme])}
-      aria-label={`Theme: ${theme}. Switch to ${NEXT_THEME[theme]}`}
-      title={`Theme: ${theme}`}
-    >
-      {THEME_ICON[theme]}
-    </button>
+    <>
+      <button
+        className="icon-btn"
+        onClick={() => setOpen(true)}
+        aria-label="Appearance"
+        title="Appearance"
+      >
+        {THEME_ICON[theme]}
+      </button>
+      {open && <AppearanceSheet onClose={() => setOpen(false)} />}
+    </>
   );
 }
 
@@ -97,7 +104,7 @@ function TopBar() {
           </div>
           <div className="topbar-actions">
             {pathname === '/ledger' && <MonthPill />}
-            <ThemeButton />
+            <AppearanceButton />
           </div>
         </div>
       </header>
