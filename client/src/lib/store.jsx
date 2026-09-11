@@ -21,6 +21,12 @@ export function StoreProvider({ children }) {
      than inside the shell because both of those have to be able to start it —
      one flag with two ways in beats two overlapping ones. */
   const [tour, setTour] = useState(null);
+  /* Opened from the top bar, but it cannot be rendered there: .topbar carries a
+     backdrop-filter, and any element with one becomes the containing block for
+     its position:fixed descendants — so a sheet rendered inside it lays itself
+     out against the header strip rather than the viewport. It lives up here
+     with the other sheets instead. */
+  const [appearance, setAppearance] = useState(false);
   const [day, setDay] = useState(null);                // 'YYYY-MM-DD' when one day is picked
   /* The ledger opens on everything you have ever logged; a month is something
      you ask for. The dashboard is month-shaped by nature and ignores this. */
@@ -121,6 +127,9 @@ export function StoreProvider({ children }) {
       setAddSheet(null); setSplitSheet(null); setMonthSheet(false); setTour(opts);
     },
     endTour: () => setTour(null),
+    appearance,
+    openAppearance: () => setAppearance(true),
+    closeAppearance: () => setAppearance(false),
     online, pending, toast, notify, apiBehind,
     addSheet, openAdd: (opts = {}) => setAddSheet(opts), closeAdd: () => setAddSheet(null),
     splitSheet,
@@ -128,7 +137,7 @@ export function StoreProvider({ children }) {
     closeSplit: () => setSplitSheet(null),
     currency: settings?.currency || '₹',
   }), [settings, month, changeMonth, day, allTime, showAllTime, monthSheet, version, online,
-       pending, toast, notify, apiBehind, addSheet, splitSheet, tour, refresh]);
+       pending, toast, notify, apiBehind, addSheet, splitSheet, tour, appearance, refresh]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

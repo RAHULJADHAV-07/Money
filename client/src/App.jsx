@@ -1,4 +1,4 @@
-import { Component, useEffect, useState } from 'react';
+import { Component, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { StoreProvider, useStore } from './lib/store.jsx';
 import { AuthProvider, useAuth } from './lib/auth.jsx';
@@ -73,19 +73,15 @@ const THEME_ICON = { system: <IconAuto />, light: <IconSun />, dark: <IconMoon /
    through to find, with the accent and the surfaces nowhere near it. */
 function AppearanceButton() {
   const [theme] = useTheme();
-  const [open, setOpen] = useState(false);
+  const { openAppearance } = useStore();
+  /* The sheet itself is rendered by Shell, not here. .topbar has a
+     backdrop-filter, which makes it the containing block for any fixed-position
+     descendant — a sheet rendered from this button lays itself out inside the
+     header strip instead of over the page. */
   return (
-    <>
-      <button
-        className="icon-btn"
-        onClick={() => setOpen(true)}
-        aria-label="Appearance"
-        title="Appearance"
-      >
-        {THEME_ICON[theme]}
-      </button>
-      {open && <AppearanceSheet onClose={() => setOpen(false)} />}
-    </>
+    <button className="icon-btn" onClick={openAppearance} aria-label="Appearance" title="Appearance">
+      {THEME_ICON[theme]}
+    </button>
   );
 }
 
@@ -214,7 +210,10 @@ class ErrorBoundary extends Component {
 }
 
 function Shell() {
-  const { addSheet, openAdd, toast, monthSheet, splitSheet, settings, tour, startTour } = useStore();
+  const {
+    addSheet, openAdd, toast, monthSheet, splitSheet, settings, tour, startTour,
+    appearance, closeAppearance,
+  } = useStore();
   const { user } = useAuth();
   /* Asked of the ledger rather than of this device — see lib/onboarding.js.
      'unknown' while it is deciding, so neither greeting flashes up first. */
@@ -258,6 +257,7 @@ function Shell() {
       {addSheet && <AddSheet key={addSheet.tx?._id || addSheet.kind || 'new'} />}
       {splitSheet && <SplitSheet key={splitSheet.groupId || 'new-split'} />}
       {monthSheet && <MonthSheet />}
+      {appearance && <AppearanceSheet onClose={closeAppearance} />}
       {toast && (
         <div className="toast" role="status">
           <span className="toast-ico"><IconCheck /></span>{toast}
