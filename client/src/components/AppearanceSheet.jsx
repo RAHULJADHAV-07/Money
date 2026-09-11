@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import Sheet from './Sheet.jsx';
 import { useTheme, THEMES } from '../lib/theme.js';
 import {
@@ -28,12 +29,38 @@ function Mini({ canvas, surface, line, accent }) {
 function Panel() {
   const [theme, setTheme, resolved] = useTheme();
   const { accent, surface } = useAppearance();
-  const named = ACCENTS.find((a) => a.h === accent);
 
-  /* Dragging paints without saving, so a scrub across the spectrum does not
-     write to storage on every frame; the commit happens on release. */
-  const scrub = (h) => paintAppearance({ accent: Number(h) });
-  const commit = (h) => setAppearance({ accent: Number(h) });
+  /* The slider needs a value of its own while it is being dragged.
+     Painting alone is not enough: this is a controlled input, so if the only
+     thing a drag changes is a css variable, React re-renders it straight back
+     to the stored hue and the thumb cannot move at all — and the commit on
+     release then reads that reset value and saves the hue you started from.
+     Which is exactly how it behaved.
+
+     So the drag is held here and the stored value is written on release, which
+     also keeps a scrub across the spectrum from hitting storage every frame.
+     The ref shadows the state because the release handler has to read the
+     latest hue, not the one captured when its render closed over it. */
+  const [dragHue, setDragHue] = useState(null);
+  const dragRef = useRef(null);
+  const shown = dragHue ?? accent;
+  const named = ACCENTS.find((a) => a.h === shown);
+
+  const scrub = (h) => {
+    const n = Number(h);
+    dragRef.current = n;
+    setDragHue(n);
+    paintAppearance({ accent: n });
+  };
+  const settle = () => {
+    if (dragRef.current === null) return;
+    setAppearance({ accent: dragRef.current });
+    dragRef.current = null;
+    setDragHue(null);
+  };
+  /* Closing the sheet mid-drag would otherwise leave the app painted in a hue
+     that was never saved, and snap back on the next load. */
+  useEffect(() => settle, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
@@ -67,12 +94,12 @@ function Panel() {
 
       <div className="ap-label ap-label--lead">
         Accent
-        <span className="ap-now">{named ? named.label : `${accent}°`}</span>
+        <span className="ap-now">{named ? named.label : `${shown}°`}</span>
       </div>
       <div className="ap-swatches">
         {ACCENTS.map((a) => (
           <button
-            key={a.id} className="ap-swatch" aria-pressed={accent === a.h}
+            key={a.id} className="ap-swatch" aria-pressed={shown === a.h}
             style={{ '--sw': `oklch(0.66 0.15 ${a.h})` }}
             title={a.label} aria-label={a.label}
             onClick={() => setAppearance({ accent: a.h })}
@@ -85,11 +112,12 @@ function Panel() {
       <label className="ap-spectrum">
         <span className="ap-spectrum-t">Anything else</span>
         <input
-          type="range" min="0" max="359" value={accent} aria-label="Accent hue"
+          type="range" min="0" max="359" value={shown} aria-label="Accent hue"
           onChange={(e) => scrub(e.target.value)}
-          onPointerUp={(e) => commit(e.target.value)}
-          onKeyUp={(e) => commit(e.target.value)}
-          onBlur={(e) => commit(e.target.value)}
+          onPointerUp={settle}
+          onPointerCancel={settle}
+          onKeyUp={settle}
+          onBlur={settle}
         />
       </label>
 
