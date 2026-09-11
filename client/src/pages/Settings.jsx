@@ -12,7 +12,7 @@ import { KINDS } from '../lib/kinds.js';
 import {
   IconSun, IconMoon, IconAuto, IconDownload, IconLogout, IconClose, IconPlus,
   IconWallet, IconTag, IconTarget, IconUser, IconInfo, IconSavings, IconChevronRight,
-  IconSpark,
+  IconSpark, IconCheck,
 } from '../components/Icons.jsx';
 import SignInMethods from '../components/SignInMethods.jsx';
 import RoutineSheet from '../components/RoutineSheet.jsx';
