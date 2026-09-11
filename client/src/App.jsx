@@ -207,11 +207,16 @@ class ErrorBoundary extends Component {
 }
 
 function Shell() {
-  const { addSheet, openAdd, toast, monthSheet, splitSheet, settings } = useStore();
+  const { addSheet, openAdd, toast, monthSheet, splitSheet, settings, tour, startTour } = useStore();
   const { user } = useAuth();
   /* Asked of the ledger rather than of this device — see lib/onboarding.js.
      'unknown' while it is deciding, so neither greeting flashes up first. */
   const firstRun = useFirstRun(user, settings);
+
+  /* A new account is started on the tour automatically; Settings can start the
+     same one by hand. Either way `tour` is what decides whether it is running,
+     so there is only one thing to reason about. */
+  useEffect(() => { if (firstRun === 'tour') startTour({ fresh: true }); }, [firstRun]);   // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="app">
       <ScrollTop />
@@ -240,8 +245,8 @@ function Shell() {
       {/* Mutually exclusive on purpose: a brand-new account gets the tour, and
           release notes for versions it was never around for would be noise on
           top of it. Everyone else gets the notes as before. */}
-      {firstRun === 'tour' && <Tour />}
-      {firstRun === 'none' && <WhatsNew />}
+      {tour && <Tour />}
+      {firstRun === 'none' && !tour && <WhatsNew />}
 
       {addSheet && <AddSheet key={addSheet.tx?._id || addSheet.kind || 'new'} />}
       {splitSheet && <SplitSheet key={splitSheet.groupId || 'new-split'} />}

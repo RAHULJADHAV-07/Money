@@ -9,6 +9,7 @@ import { KINDS } from '../lib/kinds.js';
 import {
   IconSun, IconMoon, IconAuto, IconDownload, IconLogout, IconClose, IconPlus,
   IconWallet, IconTag, IconTarget, IconUser, IconInfo, IconSavings, IconChevronRight,
+  IconSpark,
 } from '../components/Icons.jsx';
 import SignInMethods from '../components/SignInMethods.jsx';
 import RoutineSheet from '../components/RoutineSheet.jsx';
@@ -97,7 +98,7 @@ function NumberRow({ label, value, onChange, currency }) {
 }
 
 export default function Settings() {
-  const { settings, refresh, notify } = useStore();
+  const { settings, refresh, notify, startTour } = useStore();
   const { user, signOut } = useAuth();
   const [theme, setTheme] = useTheme();
   const [draft, setDraft] = useState(null);
@@ -257,6 +258,21 @@ export default function Settings() {
         </span>
         <IconChevronRight />
       </Link>
+
+      {/* The same tour a new account is started on. Kept reachable on purpose:
+          it is the only place that explains why an entry can be refused for
+          want of an opening balance, and anyone who skipped it — or who was
+          already a user when it was added — would otherwise never see it. */}
+      {/* Wrapped, not passed by reference: startTour takes options, and the
+          click event would arrive as them. */}
+      <button type="button" className="card card--link" onClick={() => startTour()}>
+        <span className="card-ico"><IconSpark /></span>
+        <span className="cardlink-body">
+          <b>Take the guided tour</b>
+          <span>A walk through all five screens, starting with your wallets. Leave it at any point.</span>
+        </span>
+        <IconChevronRight />
+      </button>
 
       <div className="card">
         <div className="card-head"><h2 className="card-title"><span className="card-ico"><IconUser /></span>Account</h2></div>

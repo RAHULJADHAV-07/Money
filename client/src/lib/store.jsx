@@ -16,6 +16,11 @@ export function StoreProvider({ children }) {
   const [addSheet, setAddSheet] = useState(null);      // { kind, person, goal, tx } | null
   const [splitSheet, setSplitSheet] = useState(null);  // { groupId } | {} for a new split
   const [monthSheet, setMonthSheet] = useState(false);
+  /* The guided tour: null, or { fresh } when a brand-new account was put on it
+     automatically rather than someone asking for it from Settings. Here rather
+     than inside the shell because both of those have to be able to start it —
+     one flag with two ways in beats two overlapping ones. */
+  const [tour, setTour] = useState(null);
   const [day, setDay] = useState(null);                // 'YYYY-MM-DD' when one day is picked
   /* The ledger opens on everything you have ever logged; a month is something
      you ask for. The dashboard is month-shaped by nature and ignores this. */
@@ -109,6 +114,13 @@ export function StoreProvider({ children }) {
     day, setDay,
     allTime, showAllTime,
     monthSheet, openMonthSheet: () => setMonthSheet(true), closeMonthSheet: () => setMonthSheet(false),
+    /* Anything already open would be behind the dimming and unreachable, so
+       starting the tour clears the sheets first. */
+    tour,
+    startTour: (opts = {}) => {
+      setAddSheet(null); setSplitSheet(null); setMonthSheet(false); setTour(opts);
+    },
+    endTour: () => setTour(null),
     online, pending, toast, notify, apiBehind,
     addSheet, openAdd: (opts = {}) => setAddSheet(opts), closeAdd: () => setAddSheet(null),
     splitSheet,
@@ -116,7 +128,7 @@ export function StoreProvider({ children }) {
     closeSplit: () => setSplitSheet(null),
     currency: settings?.currency || '₹',
   }), [settings, month, changeMonth, day, allTime, showAllTime, monthSheet, version, online,
-       pending, toast, notify, apiBehind, addSheet, splitSheet, refresh]);
+       pending, toast, notify, apiBehind, addSheet, splitSheet, tour, refresh]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

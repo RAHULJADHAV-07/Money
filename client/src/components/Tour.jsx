@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
+import { useStore } from '../lib/store.jsx';
 import { markOnboarded } from '../lib/onboarding.js';
 import { IconChevronLeft } from './Icons.jsx';
 
@@ -28,8 +29,12 @@ const STEPS = [
   {
     route: '/settings', anchor: 'opening', place: 'bottom',
     title: 'Start with what you have',
-    body: 'Put in what each wallet holds right now, before anything is logged here. Type straight into the page and press Save — the tour stays where it is.',
-    why: 'Do this first: an entry that would take a wallet below zero is refused, so an empty wallet cannot pay for your first expense.',
+    body: 'What each wallet held before you started logging here — everything you add moves up or down from these. Type straight into the page and press Save; the tour stays where it is.',
+    /* Only worth saying to someone who has not logged anything yet. Replaying
+       the tour later, it would be advice to go and change a figure that every
+       balance in the app is already counted from. */
+    why: 'Worth doing now: an entry that would take a wallet below zero is refused, so an empty wallet cannot pay for your first expense.',
+    whyWhenFresh: true,
   },
   {
     route: '/', anchor: 'balance', place: 'bottom',
@@ -80,20 +85,29 @@ const GIVE_UP = 2500;  // ms to wait for an element before deciding it is absent
 
 export default function Tour() {
   const { user } = useAuth();
+  const { tour, endTour } = useStore();
+  const fresh = !!tour?.fresh;
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
   const [i, setI] = useState(0);
   const [rect, setRect] = useState(null);      // null while looking, or absent
   const [absent, setAbsent] = useState(false);
-  const [done, setDone] = useState(false);
+  /* Where they were when this started. The tour walks them across the whole app,
+     so finishing on whatever screen the last step happened to be about would
+     strand someone who only wanted to watch it from Settings. */
+  const startedAt = useRef(pathname);
   const cardRef = useRef(null);
   const [cardBox, setCardBox] = useState({ w: 340, h: 200 });
 
   const step = STEPS[i];
   const onRoute = pathname === step.route;
 
-  const leave = useCallback((how) => { markOnboarded(user?.id, how); setDone(true); }, [user?.id]);
+  const leave = useCallback((how) => {
+    markOnboarded(user?.id, how);
+    endTour();
+    if (startedAt.current && startedAt.current !== pathname) navigate(startedAt.current);
+  }, [user?.id, endTour, navigate, pathname]);
   const next = useCallback(() => {
     setI((n) => (n < STEPS.length - 1 ? n + 1 : n));
   }, []);
@@ -186,8 +200,6 @@ export default function Tour() {
     return () => document.removeEventListener('keydown', onKey);
   }, [leave, next, step.last]);
 
-  if (done) return null;
-
   const centred = !rect;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
@@ -252,7 +264,7 @@ export default function Tour() {
 
         <h2 className="tr-title" id="tr-t">{step.title}</h2>
         <p className="tr-body">{step.body}</p>
-        {step.why && <p className="tr-why">{step.why}</p>}
+        {step.why && (!step.whyWhenFresh || fresh) && <p className="tr-why">{step.why}</p>}
 
         <div className="tr-foot">
           <div className="tr-dots" aria-hidden="true">
