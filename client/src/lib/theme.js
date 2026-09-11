@@ -6,7 +6,9 @@ import { useEffect, useState } from 'react';
 const KEY = 'hisab.theme';
 export const THEMES = ['system', 'light', 'dark'];
 
-// Matches --canvas in styles.css, so the browser chrome and the page agree.
+/* Only a fallback now. The real value is read off the page below: --canvas is
+   oklch at whatever accent is chosen, so a hardcoded pair here would drift the
+   moment someone picked a different one. */
 const CHROME = { light: '#f4f6f4', dark: '#080b0a' };
 
 const listeners = new Set();
@@ -28,7 +30,16 @@ export function resolvedTheme(mode = getTheme()) {
 
 function paintChrome(mode) {
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', CHROME[resolvedTheme(mode)]);
+  if (!meta) return;
+  /* Asked of the page rather than stated here. body carries `background:
+     var(--canvas)`, and a computed background always resolves to rgb() — which
+     theme-color understands, where oklch() is not reliably supported. */
+  let paint = '';
+  try {
+    const bg = getComputedStyle(document.body).backgroundColor;
+    if (bg && bg !== 'transparent' && !bg.startsWith('rgba(0, 0, 0, 0')) paint = bg;
+  } catch { /* fall through to the pair above */ }
+  meta.setAttribute('content', paint || CHROME[resolvedTheme(mode)]);
 }
 
 export function applyTheme(mode) {
