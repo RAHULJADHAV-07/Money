@@ -64,54 +64,61 @@ function Panel() {
 
   return (
     <>
-      <div className="ap-reset"><button className="card-action" onClick={resetAppearance}>Reset</button></div>
-
-      <div className="ap-label">Colour mode</div>
-      <div className="theme-picker">
-        {THEMES.map((t) => (
-          <button key={t} className="theme-opt" aria-pressed={theme === t} onClick={() => setTheme(t)}>
-            <span className={`theme-swatch theme-swatch--${t}`} aria-hidden="true" />
-            <span className="theme-opt-ico">{THEME_ICON[t]}</span>
-            <span className="theme-opt-label">{t}</span>
-          </button>
-        ))}
+      {/* Three rows, and all of them on screen at once. The first version put
+          each choice in its own labelled block with a paragraph of explanation
+          under every tile, which pushed the hue slider below the fold — so the
+          one control that needs to be dragged was the one you had to go looking
+          for. Names carry the explanation now, and the prose is gone. */}
+      <div className="ap-row">
+        <span className="ap-k">Mode</span>
+        <div className="ap-modes">
+          {THEMES.map((t) => (
+            <button key={t} className="ap-mode" aria-pressed={theme === t}
+                    onClick={() => setTheme(t)} title={t}>
+              {THEME_ICON[t]}
+              <span>{t}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="ap-label ap-label--lead">Surfaces</div>
-      <div className="ap-surfaces">
-        {SURFACES.map((s) => (
-          <button
-            key={s.id} className="ap-surface" aria-pressed={surface === s.id}
-            onClick={() => setAppearance({ surface: s.id })}
-          >
-            {/* Drawn from literal colours, not from data-surface: see previewFor. */}
-            <Mini {...previewFor(s.id, resolved, accent)} />
-            <span className="ap-surface-t">{s.label}</span>
-            <span className="ap-surface-h">{s.hint}</span>
-          </button>
-        ))}
+      <div className="ap-row">
+        <span className="ap-k">Surface</span>
+        <div className="ap-surfaces">
+          {SURFACES.map((sf) => (
+            <button
+              key={sf.id} className="ap-surface" aria-pressed={surface === sf.id}
+              onClick={() => setAppearance({ surface: sf.id })}
+              title={sf.hint} aria-label={`${sf.label} — ${sf.hint}`}
+            >
+              <Mini {...previewFor(sf.id, resolved, shown)} />
+              <span className="ap-surface-t">{sf.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="ap-label ap-label--lead">
-        Accent
-        <span className="ap-now">{named ? named.label : `${shown}°`}</span>
-      </div>
-      <div className="ap-swatches">
-        {ACCENTS.map((a) => (
-          <button
-            key={a.id} className="ap-swatch" aria-pressed={shown === a.h}
-            style={{ '--sw': `oklch(0.66 0.15 ${a.h})` }}
-            title={a.label} aria-label={a.label}
-            onClick={() => setAppearance({ accent: a.h })}
-          >
-            <IconCheck />
-          </button>
-        ))}
-      </div>
-
-      <label className="ap-spectrum">
-        <span className="ap-spectrum-t">Anything else</span>
+      <div className="ap-row">
+        <span className="ap-k">
+          Colour
+          <b className="ap-now">{named ? named.label : `${shown}°`}</b>
+        </span>
+        <div className="ap-swatches">
+          {ACCENTS.map((a) => (
+            <button
+              key={a.id} className="ap-swatch" aria-pressed={shown === a.h}
+              style={{ '--sw': `oklch(0.66 0.15 ${a.h})` }}
+              title={a.label} aria-label={a.label}
+              onClick={() => setAppearance({ accent: a.h })}
+            >
+              <IconCheck />
+            </button>
+          ))}
+        </div>
+        {/* Directly under the swatches, because it is the same choice by
+            another means — not a separate setting further down. */}
         <input
+          className="ap-spectrum"
           type="range" min="0" max="359" value={shown} aria-label="Accent hue"
           onChange={(e) => scrub(e.target.value)}
           onPointerUp={settle}
@@ -119,13 +126,9 @@ function Panel() {
           onKeyUp={settle}
           onBlur={settle}
         />
-      </label>
+      </div>
 
-      <p className="hint">
-        The accent carries through every surface, button and gradient. Money in and
-        money out keep their own colours — they mean something — and so do the
-        wallet cards and charts, which need several colours you can tell apart.
-      </p>
+      <button className="ap-default" onClick={resetAppearance}>Back to default</button>
     </>
   );
 }
