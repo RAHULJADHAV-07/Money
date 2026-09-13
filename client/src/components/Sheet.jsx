@@ -6,7 +6,7 @@ import { IconClose } from './Icons.jsx';
 
    `footer` pins its content to the bottom of the sheet so the primary action
    never scrolls out of reach on a long form. */
-export default function Sheet({ title, subtitle, onClose, footer, children }) {
+export default function Sheet({ title, subtitle, onClose, footer, children, passive = false }) {
   const panel = useRef(null);
   const restoreTo = useRef(null);
 
@@ -14,6 +14,11 @@ export default function Sheet({ title, subtitle, onClose, footer, children }) {
     restoreTo.current = document.activeElement;
 
     const onKey = (e) => {
+      /* `passive` means something outside this sheet is driving it — the guided
+         tour opens this one and steps through it. Trapping Tab would then put
+         the tour's own buttons out of reach, and Escape would shut the sheet
+         mid-step and leave the tour pointing at an element that had gone. */
+      if (passive) return;
       if (e.key === 'Escape') { onClose(); return; }
       if (e.key !== 'Tab' || !panel.current) return;
       // Keep Tab inside the dialog: with the page behind it inert, focus
@@ -36,11 +41,11 @@ export default function Sheet({ title, subtitle, onClose, footer, children }) {
       document.body.style.overflow = prev;
       restoreTo.current?.focus?.();
     };
-  }, [onClose]);
+  }, [onClose, passive]);
 
   return (
     <>
-      <div className="scrim" onClick={onClose} />
+      <div className="scrim" onClick={passive ? undefined : onClose} />
       <div
         className="sheet"
         role="dialog"

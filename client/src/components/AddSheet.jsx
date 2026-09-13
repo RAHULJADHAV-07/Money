@@ -59,7 +59,9 @@ export default function AddSheet() {
   /* Opens itself whenever the chosen kind lives inside it -- editing a saved
      repayment, or the sheet opened straight onto one -- because a picker that
      hid its own selection would be lying about what is set. */
-  const [showMore, setShowMore] = useState(() => !EVERYDAY.includes(addSheet?.tx?.kind || addSheet?.kind || 'expense'));
+  const [showMore, setShowMore] = useState(
+    () => !!addSheet?.expand || !EVERYDAY.includes(addSheet?.tx?.kind || addSheet?.kind || 'expense')
+  );
 
   useEffect(() => {
     api.goals().then((g) => setGoals(g.items)).catch(() => {});
@@ -100,6 +102,12 @@ export default function AddSheet() {
   }, [editing, addSheet]);
 
   useEffect(() => { if (!EVERYDAY.includes(kind)) setShowMore(true); }, [kind]);
+  /* The guided tour opens this sheet twice — shut, then open — to show the
+     everyday three and then the ones involving someone else. It reuses the same
+     sheet rather than remounting it, so the drawer has to answer to the prop. */
+  useEffect(() => {
+    if (addSheet?.expand !== undefined) setShowMore(!!addSheet.expand);
+  }, [addSheet?.expand]);
 
   const needs = KINDS[kind]?.needs;
   const categories = settings?.categories || [];
@@ -193,14 +201,14 @@ export default function AddSheet() {
   }
 
   return (
-    <Sheet title={title} subtitle={KINDS[kind]?.label} onClose={closeAdd}>
+    <Sheet title={title} subtitle={KINDS[kind]?.label} onClose={closeAdd} passive={!!addSheet?.tour}>
       {error && <div className="error-msg" role="alert">{error}</div>}
 
       {/* The three that answer almost everything, then a way to the other eight.
           No heading over these: with a labelled drawer underneath, "Everyday"
           was a word explaining something already obvious. */}
       <div className="kindpick">
-        <div className="kindrow" role="radiogroup" aria-label="Everyday">
+        <div className="kindrow" role="radiogroup" aria-label="Everyday" data-tour="kinds">
           {EVERYDAY.map((k) => (
             <button
               key={k} type="button" role="radio" aria-checked={kind === k}
@@ -223,7 +231,8 @@ export default function AddSheet() {
           </button>
         ) : (
           MORE_GROUPS.map((g) => (
-            <div className="kindgroup" key={g.label} role="radiogroup" aria-label={g.label}>
+            <div className="kindgroup" key={g.label} role="radiogroup" aria-label={g.label}
+                 data-tour={g.label === 'With people' ? 'kinds-people' : undefined}>
               <span className="kindgroup-l">{g.label}</span>
               <div className="kindrow">
                 {g.kinds.map((k) => (
@@ -242,7 +251,7 @@ export default function AddSheet() {
         )}
       </div>
 
-      <div className="field field--lead">
+      <div className="field field--lead" data-tour="amount">
         <label className="field-label" htmlFor="amt">Amount</label>
         <div className="amount-field">
           <span className="amount-cur">{currency}</span>

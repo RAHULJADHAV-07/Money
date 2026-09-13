@@ -2323,6 +2323,16 @@ select.input option {
    Pointer events are off throughout — the screen underneath is live, which is
    what lets someone type their opening balances during the step about opening
    balances.                                                                  */
+/* What actually holds the screen still. Above the sheets at 61 and the toast
+   at 80, below the spotlight and the card, and transparent — the dimming is
+   drawn by .tr-hole, which cannot do this job because a box-shadow is paint and
+   takes no pointer events. `touch-action: none` stops a finger scrolling the
+   page behind it; the tour does its own scrolling. */
+.tr-block {
+  position: fixed; inset: 0; z-index: 95;
+  background: transparent;
+  touch-action: none;
+}
 .tr-hole, .tr-dim {
   position: fixed; z-index: 96; pointer-events: none;
   animation: fade .2s var(--ease);

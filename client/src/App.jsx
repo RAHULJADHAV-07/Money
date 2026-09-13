@@ -153,7 +153,7 @@ const NAV = [
 
 function Nav() {
   return (
-    <nav className="nav" aria-label="Main" data-tour="nav">
+    <nav className="nav" aria-label="Main">
       {NAV.map(([to, label, Icon]) => (
         <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}>
           <span className="nav-ico"><Icon /></span>
