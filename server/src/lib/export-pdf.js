@@ -38,15 +38,33 @@ const safe = (v) => {
   return out.replace(/[^\u0000-\u00FF]/g, '?');
 };
 
-const M = 42;                                  // page margin
-const COLS = [                                 // x offset, width, alignment
-  { k: 'date', label: 'Date', w: 62, align: 'left' },
-  { k: 'description', label: 'Description', w: 176, align: 'left' },
-  { k: 'wallet', label: 'Wallet', w: 92, align: 'left' },
-  { k: 'paidOut', label: 'Paid out', w: 74, align: 'right' },
-  { k: 'paidIn', label: 'Paid in', w: 74, align: 'right' },
-  { k: 'balance', label: 'Balance', w: 82, align: 'right' },
+const M = 36;                                  // page margin
+
+/* Fixed widths measured against the widest thing each column can hold at 8.5pt
+   Helvetica, plus room to spare: a date is 48.2pt, "Bank -> UPI" is 46pt, and a
+   seven-figure negative balance in bold is 61pt. The date gets 68 rather than
+   the 60 that would just about do — at 60 it missed by two tenths of a point
+   and wrapped the year onto a line of its own on every single row. Description takes whatever is
+   left over rather than a number of its own — which is the whole point.
+
+   The first version hardcoded all six and they came to 560pt against 511pt of
+   usable page, so the balance column ran off the right edge and was clipped.
+   Deriving the flexible one from the real page width means the table cannot be
+   wider than the paper, whatever the margin or page size is set to. */
+const FIXED = [
+  { k: 'date', label: 'Date', w: 68, align: 'left' },
+  { k: 'description', label: 'Description', w: null, align: 'left' },
+  { k: 'wallet', label: 'Wallet', w: 60, align: 'left' },
+  { k: 'paidOut', label: 'Paid out', w: 68, align: 'right' },
+  { k: 'paidIn', label: 'Paid in', w: 68, align: 'right' },
+  { k: 'balance', label: 'Balance', w: 74, align: 'right' },
 ];
+
+function columns(doc) {
+  const avail = doc.page.width - M * 2;
+  const spoken = FIXED.reduce((n, c) => n + (c.w || 0), 0);
+  return FIXED.map((c) => (c.w ? c : { ...c, w: Math.max(80, avail - spoken) }));
+}
 
 const fmt = (n, cur) => (n === null || n === undefined
   ? ''
@@ -63,7 +81,7 @@ function tableHeader(doc, y) {
   doc.save();
   doc.rect(M, y, doc.page.width - M * 2, 20).fill(INK);
   doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(8.5);
-  for (const c of COLS) {
+  for (const c of columns(doc)) {
     doc.text(safe(c.label.toUpperCase()), x + 6, y + 6, { width: c.w - 12, align: c.align });
     x += c.w;
   }
@@ -125,8 +143,10 @@ export function buildPdf(st, { name, email }) {
   }
 
   doc.font('Helvetica').fontSize(8.5);
+  const cols = columns(doc);
+  const descW = cols.find((c) => c.k === 'description').w - 12;
   for (const e of st.entries) {
-    const lines = Math.max(1, Math.ceil(doc.widthOfString(e.description) / (COLS[1].w - 12)));
+    const lines = Math.max(1, Math.ceil(doc.widthOfString(safe(e.description)) / descW));
     const h = Math.max(18, 8 + lines * 10);
 
     if (y + h > bottom) {
@@ -144,7 +164,7 @@ export function buildPdf(st, { name, email }) {
       paidIn: fmt(e.paidIn, sym),
       balance: fmt(e.balance, sym),
     };
-    for (const c of COLS) {
+    for (const c of cols) {
       doc.fillColor(c.k === 'balance' ? INK : c.k === 'paidIn' ? '#0E7C55' : c.k === 'paidOut' ? '#B23A2B' : INK)
          .font(c.k === 'balance' ? 'Helvetica-Bold' : 'Helvetica')
          .text(cells[c.k] ?? '', x + 6, y + 5, { width: c.w - 12, align: c.align, lineBreak: c.k === 'description' });
