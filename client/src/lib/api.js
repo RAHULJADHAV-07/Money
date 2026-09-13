@@ -168,5 +168,11 @@ export const api = {
   deleteGoal: (id) => del(`/goals/${id}`),
   settings: () => get('/settings'),
   saveSettings: (body) => put('/settings', body),
-  exportUrl: () => `${BASE}/export/csv`,
+  /* `kind` is csv, xlsx or pdf; the window and the wallet ride along as query
+     parameters so all three answer the same question. */
+  exportUrl: (kind, params = {}) => {
+    const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v));
+    const s = q.toString();
+    return `${BASE}/export/${kind}${s ? `?${s}` : ''}`;
+  },
 };

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, getToken } from '../lib/api.js';
+import { api } from '../lib/api.js';
 import { useApi, useStore } from '../lib/store.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { money, dayLabel } from '../lib/format.js';
@@ -12,6 +12,7 @@ import {
 } from '../components/Icons.jsx';
 import SignInMethods from '../components/SignInMethods.jsx';
 import RoutineSheet from '../components/RoutineSheet.jsx';
+import ExportSheet from '../components/ExportSheet.jsx';
 
 const CADENCE_LABEL = {
   daily: 'Every day', weekly: 'Every week', monthly: 'Every month',
@@ -102,6 +103,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(null);   // {} for a new routine, the routine for an edit
   const [reload, setReload] = useState(0);
+  const [exporting, setExporting] = useState(false);
 
   const routines = useApi(() => api.routines(), [reload]).data?.items || [];
   const goals = useApi(() => api.goals(), []).data?.items || [];
@@ -127,26 +129,6 @@ export default function Settings() {
 
   const set = (patch) => setDraft({ ...draft, ...patch });
   const openingTotal = Object.values(draft.openingBalances || {}).reduce((n, v) => n + (Number(v) || 0), 0);
-
-  // The export endpoint is authenticated, so fetch it with the token and hand
-  // the browser a blob rather than linking straight to the URL.
-  async function downloadCsv() {
-    try {
-      const res = await fetch(api.exportUrl(), { headers: { Authorization: `Bearer ${getToken()}` } });
-      if (!res.ok) throw new Error('Could not prepare the file');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `hisab-${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      notify(err.message);
-    }
-  }
 
   async function save() {
     setSaving(true);
@@ -276,8 +258,13 @@ export default function Settings() {
 
       <div className="card">
         <div className="card-head"><h2 className="card-title">Your data</h2></div>
-        <button className="btn btn--block" onClick={downloadCsv}><IconDownload />Download everything as CSV</button>
-        <p className="hint">Saves a spreadsheet-ready file with every entry you have logged.</p>
+        <button className="btn btn--block" onClick={() => setExporting(true)}>
+          <IconDownload />Export a statement
+        </button>
+        <p className="hint">
+          A PDF laid out like a bank statement, an Excel file with the columns and totals
+          already set, or plain CSV — for any month, any range of dates, and any wallet.
+        </p>
       </div>
 
       <div className="about">
@@ -285,6 +272,8 @@ export default function Settings() {
         Add My Hisab to your home screen for the full app experience — it works offline and
         syncs whatever you logged the moment you are back online.
       </div>
+
+      {exporting && <ExportSheet onClose={() => setExporting(false)} />}
 
       {editing && (
         <RoutineSheet

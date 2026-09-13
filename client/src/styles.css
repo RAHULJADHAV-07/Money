@@ -2314,6 +2314,47 @@ select.input option {
   .ap-swatch { transition: none; }
 }
 
+/* ── Export ────────────────────────────────────────────────────────────────
+   Three formats of one statement, so the questions underneath them are shared
+   rather than repeated per format.                                          */
+.ex-k {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: 9px;
+}
+.ex-k--lead { margin-top: 20px; }
+
+.ex-formats { display: grid; gap: 7px; }
+.ex-format {
+  padding: 11px 13px; border-radius: var(--r-sm); text-align: left;
+  background: var(--surface-2); border: 1px solid var(--line);
+  transition: border-color .15s var(--ease), background .15s var(--ease);
+}
+.ex-format:hover { border-color: var(--line-2); }
+.ex-format[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 11%, var(--surface));
+}
+.ex-format-t {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 14px; font-weight: 650;
+}
+.ex-format-t svg { width: 15px; height: 15px; color: var(--accent); }
+.ex-format-h { display: block; font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+
+.ex-wallets { display: flex; flex-wrap: wrap; gap: 6px; }
+.ex-wallet {
+  padding: 8px 13px; border-radius: var(--r-pill);
+  font-size: 12.5px; font-weight: 570;
+  background: var(--surface); color: var(--ink-2);
+  border: 1px solid var(--line);
+  transition: background .15s var(--ease), color .15s, border-color .15s;
+}
+.ex-wallet:hover { border-color: var(--line-2); }
+.ex-wallet[aria-pressed='true'] {
+  background: var(--accent); border-color: var(--accent);
+  color: #fff; font-weight: 640;
+}
+
 /* ── Guided tour ───────────────────────────────────────────────────────────
    A walk through the real screens, so the dimming has to be a hole rather than
    a sheet. `box-shadow` spread does that in one element: the box itself stays
