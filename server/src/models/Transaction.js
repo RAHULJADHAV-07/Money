@@ -107,6 +107,21 @@ export const remove = (id, userId) =>
 export const recent = (userId, limit) =>
   many(`${SELECT} where t.user_id = $1 order by t.date desc, t.created_at desc limit $2`, [userId, limit]);
 
+/* A statement reads forwards, so this is the one query that comes back oldest
+   first. Shares buildWhere with the list, so "this month, UPI only" means the
+   same thing on screen and on paper. */
+export function forStatement(userId, filters) {
+  const { where, values } = buildWhere(userId, filters);
+  return many(`${SELECT} where ${where} order by t.date asc, t.created_at asc`, values);
+}
+
+/* Just enough of everything before the window to know what the balance already
+   stood at. Four columns rather than the lot — this can be the whole history. */
+export function effectsBefore(userId, { from, method }) {
+  const { where, values } = buildWhere(userId, { before: from, ...(method && { method }) });
+  return many(`select t.kind, t.amount, t.method, t.to_method from transactions t where ${where}`, values);
+}
+
 export const allForExport = (userId) =>
   many(`${SELECT} where t.user_id = $1 order by t.date asc, t.created_at asc`, [userId]);
 

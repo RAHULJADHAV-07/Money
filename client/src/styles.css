@@ -2,9 +2,16 @@
    My Hisab — design system
 
    Three rules the whole file obeys:
-   1. Colour carries one meaning at a time. Green is money arriving, orange is
-      money leaving, blue is magnitude. Identity colour (a category, a person, a
-      wallet) never borrows those three.
+   1. Colour carries one meaning at a time. Money arriving is green and money
+      leaving is red, fixed, and they do not follow the accent: what you lent
+      against what you borrowed has to be readable at a glance, and those two
+      colours are the pair everybody already reads without being taught. The
+      reds below are a shade darker than the green on purpose — red against
+      green is the one pairing colour blindness attacks, and the difference in
+      lightness is what survives it (14.5 ΔE2000 under protanopia and
+      deuteranopia, where 8 is the bar).
+      Everything else — chrome, surfaces, wallet cards, charts, the calendar —
+      takes whatever accent was chosen in Appearance.
    2. Neutrals are tinted a few degrees toward the accent, so a white card on
       the canvas never looks cold next to the hero. Every surface, line and ink
       below is stated in oklch at the accent's own hue, which is what lets one
@@ -48,7 +55,7 @@
 
   /* ── Meaning ──────────────────────────────────────────────────────────── */
   --in:     #0e9f6e;   /* money arriving */
-  --out:    #e2622f;   /* money leaving  */
+  --out:    #d8442c;   /* money leaving  */
   /* Savings sits a little off the accent — far enough that "set aside" is not
      the accent exactly, near enough that it is plainly the same scheme. It was
      45° and that was too far: at an amber accent it came out green, which is
@@ -137,7 +144,7 @@
     --ink-3: oklch(0.593 calc(0.019 * var(--sf-c)) var(--accent-h));
 
     --in:     #2fb98a;
-    --out:    #f0743f;
+    --out:    #ef6a4a;
     --save:   oklch(0.719 0.110 calc(var(--accent-h) + 15));
     --warn:   #dfa72b;
     --danger: #f0625c;
@@ -186,7 +193,7 @@
   --ink-3: oklch(0.593 calc(0.019 * var(--sf-c)) var(--accent-h));
 
   --in:     #2fb98a;
-  --out:    #f0743f;
+  --out:    #ef6a4a;
   --save:   oklch(0.719 0.110 calc(var(--accent-h) + 15));
   --warn:   #dfa72b;
   --danger: #f0625c;
@@ -710,14 +717,17 @@ button.cat:hover { background: var(--surface-2); }
 .trend-read-v { display: flex; gap: 14px; font-size: 13.5px; font-weight: 660; letter-spacing: -.02em; }
 
 /* ═══ Wallet cards ═════════════════════════════════════════════════════════ */
+/* A grid that reflows, not a rail that scrolls sideways. The rail bled past
+   both gutters and its cards were a fixed 158px, so on a phone the third one
+   was sliced down the middle at the edge of the screen with nothing to say it
+   could be swiped — it just looked broken. Columns fill the width instead:
+   two on a phone, more as there is room, and nothing is ever half-visible. */
 .wallet-rail {
-  display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none;
-  padding: 2px var(--gutter) 8px; margin: 0 calc(var(--gutter) * -1);
-  scroll-snap-type: x mandatory;
+  display: grid; gap: 10px; padding: 2px 0 0;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
 }
-.wallet-rail::-webkit-scrollbar { display: none; }
 .wcard {
-  flex: none; width: 158px; scroll-snap-align: start;
+  min-width: 0;
   padding: 14px; border-radius: var(--r-lg);
   color: #fff; position: relative; overflow: hidden;
   background: linear-gradient(150deg, var(--wc), color-mix(in oklab, var(--wc) 60%, #000));
@@ -1592,9 +1602,6 @@ select.input option {
   .g-cats { grid-column: 1; }
   .g-recent { grid-column: 2; }
 
-  .wallet-rail { flex-wrap: wrap; margin: 0; padding: 2px 0 0; }
-  .wcard { width: calc(50% - 5px); }
-
   .qa { grid-template-columns: repeat(4, 1fr); max-width: 520px; }
 }
 
@@ -2194,76 +2201,89 @@ select.input option {
 }
 
 /* ── Appearance panel ──────────────────────────────────────────────────────
-   Every control here paints in the thing it is selecting: the surface tiles are
-   miniatures rendered in their own preset's tokens, and the swatches are the
-   accent at the lightness the app will actually use it at. Nothing is a label
-   for a colour you cannot see.                                              */
-/* Inside a sheet now, not a card, so Reset needs its own line to sit on. */
-.ap-reset { display: flex; justify-content: flex-end; margin: -4px 0 10px; }
-
-.ap-label {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+   Three rows that fit on one screen. Every control paints in the thing it is
+   selecting — the surface tiles are miniatures in their own preset's colours,
+   the swatches are the accent at the lightness the app uses it at, and the
+   slider is the wheel it picks from. Nothing here is a word standing in for a
+   colour you cannot see.                                                    */
+.ap-row { margin-bottom: 18px; }
+.ap-row:last-of-type { margin-bottom: 14px; }
+.ap-k {
+  display: flex; align-items: baseline; gap: 8px;
   font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
-  text-transform: uppercase; color: var(--ink-3); margin-bottom: 9px;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: 8px;
 }
-.ap-label--lead { margin-top: 20px; }
-.ap-now { font-size: 11px; font-weight: 650; letter-spacing: 0; text-transform: none; color: var(--accent); }
+.ap-now {
+  font-size: 11px; font-weight: 650; letter-spacing: 0;
+  text-transform: none; color: var(--accent);
+}
 
-.ap-surfaces { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.ap-surface {
-  padding: 9px; border-radius: var(--r-sm);
+/* ── Mode ─────────────────────────────────────────────────────────────────── */
+.ap-modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ap-mode {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 6px; border-radius: var(--r-sm);
   background: var(--surface-2); border: 1px solid var(--line);
-  text-align: left;
+  font-size: 12.5px; font-weight: 600; color: var(--ink-2);
+  text-transform: capitalize;
+  transition: border-color .15s var(--ease), background .15s var(--ease), color .15s;
+}
+.ap-mode svg { width: 15px; height: 15px; flex: none; }
+.ap-mode:hover { border-color: var(--line-2); }
+.ap-mode[aria-pressed='true'] {
+  border-color: var(--accent); color: var(--ink);
+  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+}
+
+/* ── Surface ──────────────────────────────────────────────────────────────── */
+.ap-surfaces { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.ap-surface {
+  padding: 6px 6px 7px; border-radius: var(--r-sm);
+  background: var(--surface-2); border: 1px solid var(--line);
   transition: border-color .15s var(--ease), background .15s var(--ease);
 }
 .ap-surface:hover { border-color: var(--line-2); }
 .ap-surface[aria-pressed='true'] {
   border-color: var(--accent);
-  background: color-mix(in oklab, var(--accent) 9%, var(--surface));
+  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
 }
 /* Colours come from inline styles, computed by previewFor — a nested
    data-surface cannot work, because --canvas and friends are declared on :root
    and a custom property is substituted where it is declared. */
 .ap-mini {
-  display: block; height: 44px; border-radius: var(--r-xs);
-  border: 1px solid; padding: 6px; margin-bottom: 8px; overflow: hidden;
+  display: block; height: 34px; border-radius: 7px;
+  border: 1px solid; padding: 5px; overflow: hidden;
 }
-.ap-mini-bar { display: block; height: 7px; width: 52%; border-radius: 4px; }
-.ap-mini-card {
-  display: block; margin-top: 5px; padding: 4px;
-  border-radius: 4px; border: 1px solid;
+.ap-mini-bar { display: block; height: 5px; width: 58%; border-radius: 3px; }
+.ap-mini-card { display: block; margin-top: 4px; padding: 3px; border-radius: 3px; border: 1px solid; }
+.ap-mini-card i { display: block; height: 2px; border-radius: 1px; }
+.ap-mini-card i.short { width: 55%; margin-top: 2px; }
+.ap-surface-t {
+  display: block; margin-top: 6px; text-align: center;
+  font-size: 11px; font-weight: 620; color: var(--ink-2);
 }
-.ap-mini-card i { display: block; height: 3px; border-radius: 2px; }
-.ap-mini-card i.short { width: 55%; margin-top: 3px; }
-.ap-surface-t { display: block; font-size: 12.5px; font-weight: 640; }
-.ap-surface-h { display: block; font-size: 10.5px; color: var(--ink-3); line-height: 1.4; margin-top: 2px; }
+.ap-surface[aria-pressed='true'] .ap-surface-t { color: var(--ink); }
 
-.ap-swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+/* ── Colour ───────────────────────────────────────────────────────────────── */
+.ap-swatches { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; }
 .ap-swatch {
   aspect-ratio: 1; border-radius: 50%;
   background: var(--sw);
   display: grid; place-items: center;
-  border: 2px solid transparent;
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 12%, transparent) inset;
   transition: transform .14s var(--spring), box-shadow .15s;
 }
-.ap-swatch:hover { transform: scale(1.08); }
-.ap-swatch svg { width: 14px; height: 14px; color: #fff; opacity: 0; transition: opacity .12s; }
-.ap-swatch[aria-pressed='true'] {
-  box-shadow: 0 0 0 2px var(--canvas), 0 0 0 4px var(--sw);
-}
+.ap-swatch:hover { transform: scale(1.12); }
+.ap-swatch svg { width: 12px; height: 12px; color: #fff; opacity: 0; transition: opacity .12s; }
+.ap-swatch[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--sw); }
 .ap-swatch[aria-pressed='true'] svg { opacity: 1; }
 
-.ap-spectrum { display: block; margin-top: 16px; }
-.ap-spectrum-t {
-  display: block; font-size: 11px; font-weight: 600; color: var(--ink-3); margin-bottom: 7px;
-}
-/* The whole wheel, so the slider shows what it is choosing from. Drawn in oklch
-   at the same lightness the accent is used at, not at full saturation — a rail
-   of neon would promise colours the app never paints. */
-.ap-spectrum input {
+/* The whole wheel, drawn at the lightness the accent is actually used at — a
+   rail of neon would promise colours the app never paints. */
+.ap-spectrum {
   -webkit-appearance: none; appearance: none;
-  width: 100%; height: 14px; border-radius: var(--r-pill);
+  display: block; width: 100%; margin-top: 10px;
+  height: 12px; border-radius: var(--r-pill);
   background: linear-gradient(90deg,
     oklch(0.66 0.15 0), oklch(0.66 0.15 40), oklch(0.66 0.15 80), oklch(0.66 0.15 120),
     oklch(0.66 0.15 160), oklch(0.66 0.15 200), oklch(0.66 0.15 240), oklch(0.66 0.15 280),
@@ -2271,22 +2291,68 @@ select.input option {
   border: 1px solid var(--line);
   cursor: pointer;
 }
-.ap-spectrum input::-webkit-slider-thumb {
+.ap-spectrum::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
-  width: 20px; height: 20px; border-radius: 50%;
-  background: var(--accent);
-  border: 3px solid var(--surface);
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); border: 3px solid var(--surface);
   box-shadow: var(--e2), 0 0 0 1px color-mix(in oklab, var(--ink) 20%, transparent);
 }
-.ap-spectrum input::-moz-range-thumb {
-  width: 20px; height: 20px; border-radius: 50%;
-  background: var(--accent);
-  border: 3px solid var(--surface);
-  box-shadow: var(--e2);
+.ap-spectrum::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); border: 3px solid var(--surface); box-shadow: var(--e2);
 }
+
+.ap-default {
+  display: block; width: 100%; padding: 9px;
+  border-radius: var(--r-sm); border: 1px solid var(--line);
+  font-size: 12.5px; font-weight: 600; color: var(--ink-3);
+  transition: color .15s, border-color .15s;
+}
+.ap-default:hover { color: var(--ink-2); border-color: var(--line-2); }
 
 @media (prefers-reduced-motion: reduce) {
   .ap-swatch { transition: none; }
+}
+
+/* ── Export ────────────────────────────────────────────────────────────────
+   Three formats of one statement, so the questions underneath them are shared
+   rather than repeated per format.                                          */
+.ex-k {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: 9px;
+}
+.ex-k--lead { margin-top: 20px; }
+
+.ex-formats { display: grid; gap: 7px; }
+.ex-format {
+  padding: 11px 13px; border-radius: var(--r-sm); text-align: left;
+  background: var(--surface-2); border: 1px solid var(--line);
+  transition: border-color .15s var(--ease), background .15s var(--ease);
+}
+.ex-format:hover { border-color: var(--line-2); }
+.ex-format[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 11%, var(--surface));
+}
+.ex-format-t {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 14px; font-weight: 650;
+}
+.ex-format-t svg { width: 15px; height: 15px; color: var(--accent); }
+.ex-format-h { display: block; font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+
+.ex-wallets { display: flex; flex-wrap: wrap; gap: 6px; }
+.ex-wallet {
+  padding: 8px 13px; border-radius: var(--r-pill);
+  font-size: 12.5px; font-weight: 570;
+  background: var(--surface); color: var(--ink-2);
+  border: 1px solid var(--line);
+  transition: background .15s var(--ease), color .15s, border-color .15s;
+}
+.ex-wallet:hover { border-color: var(--line-2); }
+.ex-wallet[aria-pressed='true'] {
+  background: var(--accent); border-color: var(--accent);
+  color: #fff; font-weight: 640;
 }
 
 /* ── Guided tour ───────────────────────────────────────────────────────────
@@ -2298,6 +2364,16 @@ select.input option {
    Pointer events are off throughout — the screen underneath is live, which is
    what lets someone type their opening balances during the step about opening
    balances.                                                                  */
+/* What actually holds the screen still. Above the sheets at 61 and the toast
+   at 80, below the spotlight and the card, and transparent — the dimming is
+   drawn by .tr-hole, which cannot do this job because a box-shadow is paint and
+   takes no pointer events. `touch-action: none` stops a finger scrolling the
+   page behind it; the tour does its own scrolling. */
+.tr-block {
+  position: fixed; inset: 0; z-index: 95;
+  background: transparent;
+  touch-action: none;
+}
 .tr-hole, .tr-dim {
   position: fixed; z-index: 96; pointer-events: none;
   animation: fade .2s var(--ease);

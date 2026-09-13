@@ -10,51 +10,64 @@ import { IconChevronLeft } from './Icons.jsx';
  *
  * Each step names a route and an element, and the tour goes there: it
  * navigates, waits for the thing to exist, scrolls it into view, cuts a hole in
- * the dimming around it and puts a card beside it. What is behind the dimming is
- * the real screen, and it stays live -- the overlay takes no pointer events -- so
- * the opening-balance step is somewhere you can actually type rather than a
- * picture of somewhere you can type.
+ * the dimming around it and puts a card beside it.
+ *
+ * Everything behind the dimming is inert while it runs. The first version left
+ * the overlay click-through so the opening-balance step could be typed into,
+ * and the cost was that one stray tap anywhere -- the nav, a wallet card, the
+ * add button -- moved the app out from under the tour and left it pointing at
+ * something that was no longer there. A tour you can fall out of by touching
+ * the screen is worse than one you cannot type into, so the screen is sealed
+ * and the tour drives the app itself: it opens the add sheet, expands it, and
+ * closes it again as the steps require.
  *
  * Steps whose element is not on the page are skipped rather than shown against
  * nothing. That is not an edge case but the normal state of a new account: the
- * wallet rail and the one-tap row only render once there is something in them,
- * which on day one there is not.
+ * wallet rail only renders once there is something in it.
  *
- * Settings comes first on purpose. Every wallet starts empty, and an entry that
- * would take one below zero is refused -- so without opening balances the very
- * first expense someone tries to record is turned away with no explanation.
+ * Opening balances come last, because that is the thing to go and do the
+ * moment the tour lets go -- every wallet starts empty, and an entry that would
+ * take one below zero is refused, so without them the first expense anyone
+ * tries to record is turned away with no explanation.
  */
 
 const STEPS = [
   {
-    route: '/settings', anchor: 'opening', place: 'bottom',
-    title: 'Start with what you have',
-    body: 'What each wallet held before you started logging here — everything you add moves up or down from these. Type straight into the page and press Save; the tour stays where it is.',
-    /* Only worth saying to someone who has not logged anything yet. Replaying
-       the tour later, it would be advice to go and change a figure that every
-       balance in the app is already counted from. */
-    why: 'Worth doing now: an entry that would take a wallet below zero is refused, so an empty wallet cannot pay for your first expense.',
-    whyWhenFresh: true,
-  },
-  {
     route: '/', anchor: 'balance', place: 'bottom',
     title: 'Everything adds up to here',
-    body: 'Your balance in hand, with what you spent and received today underneath it. It moves the moment you log anything.',
+    body: 'Your balance in hand, with what you spent and received today beneath it. It moves the moment you log anything.',
   },
   {
     route: '/', anchor: 'wallets', place: 'bottom', optional: true,
     title: 'Where your money sits',
-    body: 'One card per wallet, each showing what is actually in it. Tap one to see only what went through it.',
+    body: 'One card per wallet, each showing what is actually in it. Tap one later to see only what went through it.',
   },
   {
     route: '/', anchor: 'add', place: 'left',
-    title: 'Add anything, from anywhere',
-    body: 'This button works on every screen. Amount first — expense, income and transfer are right there, and lending, repayments and savings are one tap further.',
+    title: 'One button, everywhere',
+    body: 'Add works from every screen. Let us open it and look inside.',
+  },
+  {
+    route: '/', anchor: 'amount', place: 'bottom', sheet: 'add',
+    title: 'The amount comes first',
+    body: 'Type the number and you are most of the way done. Everything under it is optional — the date is today until you say otherwise.',
+  },
+  {
+    route: '/', anchor: 'kinds', place: 'bottom', sheet: 'add',
+    title: 'Three types cover most days',
+    body: 'Expense for money you spent, Income for money that arrived, and Transfer for your own money moving between two of your wallets.',
+    why: 'A transfer is not spending. It leaves one wallet and lands in another, so your balance in hand does not change.',
+  },
+  {
+    route: '/', anchor: 'kinds-people', place: 'bottom', sheet: 'add-more',
+    title: 'And four more for money with people',
+    body: '“I lent” and “I borrowed” open a debt; “They repaid me” and “I repaid them” close it. The two below drop a debt nobody is going to settle.',
+    why: 'Lending is not an expense — the money is still yours, it is just not with you. That is why it has a type of its own.',
   },
   {
     route: '/ledger', anchor: 'search', place: 'bottom',
     title: 'Everything you logged',
-    body: 'Every entry you have ever made, newest first. Search by note, person or category.',
+    body: 'Every entry you have ever made, newest first. Search it by note, person or category.',
   },
   {
     route: '/ledger', anchor: 'filters', place: 'bottom',
@@ -64,7 +77,7 @@ const STEPS = [
   {
     route: '/people', anchor: 'people', place: 'bottom',
     title: 'Who owes whom',
-    body: 'Log what you lend and what you borrow and this nets it off per person, so one settled friend never hides another’s dues.',
+    body: 'Everything you lent and borrowed, netted off per person, so one settled friend never hides another’s dues. Green is coming to you, red is going out.',
   },
   {
     route: '/savings', anchor: 'savings', place: 'bottom',
@@ -72,12 +85,14 @@ const STEPS = [
     body: 'Buckets with targets. Money moved here leaves your balance in hand but stays yours — it is saved, not spent.',
   },
   {
-    route: '/', anchor: 'nav', place: 'top',
-    title: 'That is the whole app',
-    body: 'Five screens, and one button that works on all of them. Everything else you will find as you go.',
-    last: true,
+    route: '/settings', anchor: 'opening', place: 'bottom',
+    title: 'One thing before you start',
+    body: 'Put in what each wallet holds right now. The tour ends here so you can do it — type the figures and press Save.',
+    why: 'Do it first: an entry that would take a wallet below zero is refused, so an empty wallet cannot pay for your first expense.',
+    last: true, cta: 'Finish and set them',
   },
 ];
+
 
 const GAP = 14;        // between the highlight and the card
 const PAD = 8;         // breathing room around the highlighted element
@@ -85,7 +100,7 @@ const GIVE_UP = 2500;  // ms to wait for an element before deciding it is absent
 
 export default function Tour() {
   const { user } = useAuth();
-  const { tour, endTour } = useStore();
+  const { tour, endTour, openAdd, closeAdd } = useStore();
   const fresh = !!tour?.fresh;
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -105,9 +120,15 @@ export default function Tour() {
 
   const leave = useCallback((how) => {
     markOnboarded(user?.id, how);
+    closeAdd();
     endTour();
-    if (startedAt.current && startedAt.current !== pathname) navigate(startedAt.current);
-  }, [user?.id, endTour, navigate, pathname]);
+    /* Skipping puts you back where you were. Finishing does not: the last step
+       is the wallets, and the whole point of ending there is to leave you in
+       front of them. */
+    if (how === 'skipped' && startedAt.current && startedAt.current !== pathname) {
+      navigate(startedAt.current);
+    }
+  }, [user?.id, endTour, closeAdd, navigate, pathname]);
   const next = useCallback(() => {
     setI((n) => (n < STEPS.length - 1 ? n + 1 : n));
   }, []);
@@ -116,6 +137,15 @@ export default function Tour() {
   useEffect(() => {
     if (!onRoute) navigate(step.route);
   }, [onRoute, step.route, navigate]);
+
+  /* The tour opens and closes the add sheet itself, because nothing behind the
+     dimming can be tapped. `add-more` is the same sheet with its drawer open;
+     AddSheet answers to the prop rather than remounting, so stepping between
+     the two does not throw away what the previous step showed. */
+  useEffect(() => {
+    if (step.sheet) openAdd({ tour: true, expand: step.sheet === 'add-more' });
+    else closeAdd();
+  }, [i, step.sheet]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── find the element, then keep track of where it is ──────────────────────
   const find = useCallback(() => {
@@ -232,8 +262,13 @@ export default function Tour() {
 
   return (
     <>
-      {/* The dimming and the hole in it. Takes no pointer events, so the screen
-          underneath stays usable — which is the whole point on the first step. */}
+      {/* Everything behind here is inert until the tour is done with it. One
+          stray tap used to move the app out from under the tour and leave it
+          pointing at an element that had gone. */}
+      <div className="tr-block" onClick={(e) => e.stopPropagation()} aria-hidden="true" />
+
+      {/* The dimming and the hole in it — purely the picture; the layer above
+          is what actually holds the screen still. */}
       {rect ? (
         <div
           className="tr-hole"
@@ -279,7 +314,7 @@ export default function Tour() {
             )}
             <button type="button" className="btn btn--primary tr-next"
                     onClick={() => (step.last ? leave('done') : next())}>
-              {step.last ? 'Start using My Hisab' : 'Next'}
+              {step.last ? (step.cta || 'Done') : 'Next'}
             </button>
           </div>
         </div>
