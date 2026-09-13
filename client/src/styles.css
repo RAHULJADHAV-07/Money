@@ -2,13 +2,16 @@
    My Hisab — design system
 
    Three rules the whole file obeys:
-   1. One hue in the whole app, and intensity carries the meaning. Money
-      arriving is the accent at full strength; money leaving is the same hue
-      pulled back to a quiet neutral, so a ledger reads as income standing out
-      against everything else rather than as two colours competing. Only refusal
-      keeps a colour of its own — danger stays red, because an accent that has
-      been set to red must not make "delete" look like every other button.
-      Identity colour (a category, a person, a wallet) lives in palette.js.
+   1. Colour carries one meaning at a time. Money arriving is green and money
+      leaving is red, fixed, and they do not follow the accent: what you lent
+      against what you borrowed has to be readable at a glance, and those two
+      colours are the pair everybody already reads without being taught. The
+      reds below are a shade darker than the green on purpose — red against
+      green is the one pairing colour blindness attacks, and the difference in
+      lightness is what survives it (14.5 ΔE2000 under protanopia and
+      deuteranopia, where 8 is the bar).
+      Everything else — chrome, surfaces, wallet cards, charts, the calendar —
+      takes whatever accent was chosen in Appearance.
    2. Neutrals are tinted a few degrees toward the accent, so a white card on
       the canvas never looks cold next to the hero. Every surface, line and ink
       below is stated in oklch at the accent's own hue, which is what lets one
@@ -51,11 +54,8 @@
   --ink-3: oklch(0.621 calc(0.018 * var(--sf-c)) var(--accent-h));
 
   /* ── Meaning ──────────────────────────────────────────────────────────── */
-  --in:     var(--accent);                             /* money arriving */
-  /* Money leaving: the accent hue at a fraction of its chroma, which lands as
-     a near-neutral that still belongs. Expenses are most of what anyone logs,
-     so colouring them all is noise; what wants to stand out is the exception. */
-  --out:    oklch(0.460 0.045 var(--accent-h));
+  --in:     #0e9f6e;   /* money arriving */
+  --out:    #d8442c;   /* money leaving  */
   /* Savings sits a little off the accent — far enough that "set aside" is not
      the accent exactly, near enough that it is plainly the same scheme. It was
      45° and that was too far: at an amber accent it came out green, which is
@@ -143,8 +143,8 @@
     --ink-2: oklch(0.755 calc(0.017 * var(--sf-c)) var(--accent-h));
     --ink-3: oklch(0.593 calc(0.019 * var(--sf-c)) var(--accent-h));
 
-    --in:     var(--accent);
-    --out:    oklch(0.800 0.040 var(--accent-h));
+    --in:     #2fb98a;
+    --out:    #ef6a4a;
     --save:   oklch(0.719 0.110 calc(var(--accent-h) + 15));
     --warn:   #dfa72b;
     --danger: #f0625c;
@@ -192,8 +192,8 @@
   --ink-2: oklch(0.755 calc(0.017 * var(--sf-c)) var(--accent-h));
   --ink-3: oklch(0.593 calc(0.019 * var(--sf-c)) var(--accent-h));
 
-  --in:     var(--accent);
-  --out:    oklch(0.800 0.040 var(--accent-h));
+  --in:     #2fb98a;
+  --out:    #ef6a4a;
   --save:   oklch(0.719 0.110 calc(var(--accent-h) + 15));
   --warn:   #dfa72b;
   --danger: #f0625c;
