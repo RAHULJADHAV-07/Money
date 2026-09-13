@@ -10,7 +10,7 @@ import { isNewer } from './version.js';
 
 export const CHANGELOG = [
   {
-    version: '2.2.0',
+    version: '2.3.0',
     title: 'A proper welcome, a way back in, and colours that agree with each other',
     changes: [
       'New here? The app now walks you through it in five steps, and the last one asks what is already in each of your wallets. That matters more than it sounds: an entry that would take a wallet below zero is refused, so starting at zero meant your very first expense was turned away with no explanation. You can skip the whole thing.',
