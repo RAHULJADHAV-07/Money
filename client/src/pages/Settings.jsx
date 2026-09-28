@@ -5,6 +5,7 @@ import { useApi, useStore } from '../lib/store.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { money, dayLabel } from '../lib/format.js';
 import { KINDS } from '../lib/kinds.js';
+import { CARD_DEFAULTS, ordinal } from '../lib/credit.js';
 import {
   IconDownload, IconLogout, IconClose, IconPlus,
   IconWallet, IconTag, IconTarget, IconUser, IconInfo, IconSavings, IconChevronRight,
@@ -35,14 +36,92 @@ function whenLabel(r) {
 
 // Everything the settings form owns, in one place, so "has this changed?" is a
 // single comparison rather than a field-by-field one.
-const draftOf = (s) => ({
-  currency: s.currency,
-  openingBalance: s.openingBalance,
-  openingBalances: { ...(s.openingBalances || {}) },
-  categories: [...s.categories],
-  sources: [...s.sources],
-  methods: [...s.methods],
-});
+//
+// A card's opening balance is stored the way the ledger needs it -- negative,
+// by what was owed -- but typed the way anyone thinks of it: "I owed 12,000".
+// So the draft carries it as `owedAtStart` on the card, and `toSave` turns it
+// back into a negative opening balance on the way out.
+const draftOf = (s) => {
+  const cards = s.creditCards || {};
+  return {
+    currency: s.currency,
+    openingBalance: s.openingBalance,
+    openingBalances: Object.fromEntries(
+      Object.entries(s.openingBalances || {}).filter(([m]) => !cards[m])
+    ),
+    categories: [...s.categories],
+    sources: [...s.sources],
+    methods: [...s.methods],
+    creditCards: Object.fromEntries(Object.entries(cards).map(([m, c]) => {
+      const opening = Number(s.openingBalances?.[m]) || 0;
+      return [m, { ...c, owedAtStart: opening < 0 ? String(-opening) : '' }];
+    })),
+  };
+};
+
+function toSave(draft) {
+  const openingBalances = { ...draft.openingBalances };
+  const creditCards = {};
+  for (const [m, c] of Object.entries(draft.creditCards)) {
+    if (!draft.methods.includes(m)) continue;
+    const { owedAtStart, ...terms } = c;
+    creditCards[m] = terms;
+    openingBalances[m] = -(Number(owedAtStart) || 0);
+  }
+  return { ...draft, openingBalances, creditCards };
+}
+
+/* The terms a credit card runs on — the same four numbers printed at the top
+   of every statement. Each one says what it is for in the words of the bill,
+   because "statement day" means nothing until you know it is when the bill is
+   made up. */
+function CardTerms({ name, card, currency, onChange }) {
+  const set = (k) => (e) => onChange({ ...card, [k]: e.target.value });
+  const days = Array.from({ length: 31 }, (_, i) => i + 1);
+  return (
+    <div className="cc-terms">
+      <NumberRow label="Credit limit" currency={currency} value={card.limit} onChange={(v) => onChange({ ...card, limit: v })} />
+      <NumberRow label="Owed when you started" currency={currency} value={card.owedAtStart}
+                 onChange={(v) => onChange({ ...card, owedAtStart: v })} />
+      <div className="row-2 cc-days">
+        <div className="field">
+          <label className="field-label" htmlFor={`sd-${name}`}>Statement day</label>
+          <select id={`sd-${name}`} className="input" value={card.statementDay} onChange={set('statementDay')}>
+            {days.map((d) => <option key={d} value={d}>{ordinal(d)} of the month</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label className="field-label" htmlFor={`dd-${name}`}>Payment due</label>
+          <select id={`dd-${name}`} className="input" value={card.dueDay} onChange={set('dueDay')}>
+            {days.map((d) => <option key={d} value={d}>{ordinal(d)} of the month</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="row-2 cc-days">
+        <div className="field">
+          <label className="field-label" htmlFor={`apr-${name}`}>Interest a year</label>
+          <div className="suffix-field">
+            <input id={`apr-${name}`} className="input" type="number" inputMode="decimal" value={card.apr} onChange={set('apr')} />
+            <span>%</span>
+          </div>
+        </div>
+        <div className="field">
+          <label className="field-label" htmlFor={`min-${name}`}>Minimum due</label>
+          <div className="suffix-field">
+            <input id={`min-${name}`} className="input" type="number" inputMode="decimal" value={card.minPct} onChange={set('minPct')} />
+            <span>% of bill</span>
+          </div>
+        </div>
+      </div>
+      <p className="hint">
+        Spending from the {ordinal(Number(card.statementDay) === 31 ? 1 : Number(card.statementDay) + 1)} to
+        the {ordinal(card.statementDay)} is billed on the {ordinal(card.statementDay)}, and that bill is due
+        on the {ordinal(card.dueDay)}. Pay the whole bill by then and you pay no interest. Most cards in
+        India charge 36–45% a year on whatever is left.
+      </p>
+    </div>
+  );
+}
 
 function ListEditor({ label, hint, placeholder, items, onChange }) {
   const [text, setText] = useState('');
@@ -128,12 +207,19 @@ export default function Settings() {
   }
 
   const set = (patch) => setDraft({ ...draft, ...patch });
-  const openingTotal = Object.values(draft.openingBalances || {}).reduce((n, v) => n + (Number(v) || 0), 0);
+  const openingTotal = Object.entries(draft.openingBalances || {})
+    .filter(([m]) => !draft.creditCards[m])
+    .reduce((n, [, v]) => n + (Number(v) || 0), 0);
+  const setCard = (m, card) => {
+    const creditCards = { ...draft.creditCards };
+    if (card) creditCards[m] = card; else delete creditCards[m];
+    set({ creditCards });
+  };
 
   async function save() {
     setSaving(true);
     try {
-      await api.saveSettings(draft);
+      await api.saveSettings(toSave(draft));
       notify('Settings saved');
       refresh();
     } catch (err) {
@@ -150,14 +236,38 @@ export default function Settings() {
         </div>
         <p className="hint hint--lead">
           What each wallet held before you started logging here. Everything you add moves up or down from these.
+          Tick <b>credit card</b> on any wallet that is one, and it gets a bill, a due date and a limit of its own.
         </p>
-        {draft.methods.map((m) => (
-          <NumberRow
-            key={m} label={m} currency={draft.currency}
-            value={draft.openingBalances[m]}
-            onChange={(v) => set({ openingBalances: { ...draft.openingBalances, [m]: v } })}
-          />
-        ))}
+        {draft.methods.map((m) => {
+          const card = draft.creditCards[m];
+          return (
+            <div key={m} className={`wallet-set${card ? ' is-card' : ''}`}>
+              {card ? (
+                <div className="num-row"><span className="num-row-k">{m}</span></div>
+              ) : (
+                <NumberRow
+                  label={m} currency={draft.currency}
+                  value={draft.openingBalances[m]}
+                  onChange={(v) => set({ openingBalances: { ...draft.openingBalances, [m]: v } })}
+                />
+              )}
+              <label className="check cc-check">
+                <input
+                  type="checkbox" checked={!!card}
+                  onChange={(e) => setCard(m, e.target.checked
+                    ? { ...CARD_DEFAULTS, ...(settings.creditCards?.[m] || {}), owedAtStart: '' }
+                    : null)}
+                />
+                <span className="check-body">
+                  <b>{m} is a credit card</b>
+                </span>
+              </label>
+              {card && (
+                <CardTerms name={m} card={card} currency={draft.currency} onChange={(c) => setCard(m, c)} />
+              )}
+            </div>
+          );
+        })}
         <div className="divider" />
         <ListEditor
           label="Payment methods" placeholder="Cash, UPI, Bank…"

@@ -10,6 +10,7 @@ export const toJSON = (s) => ({
   methods: s.methods,
   budgets: s.budgets,
   openingBalances: s.opening_balances,
+  creditCards: s.credit_cards || {},
   createdAt: s.created_at,
   updatedAt: s.updated_at,
 });
@@ -36,12 +37,13 @@ export async function save(userId, patch) {
     budgets: 'budgets',
     openingBalances: 'opening_balances',
     openingBalance: 'opening_balance',
+    creditCards: 'credit_cards',
   };
   const sets = [];
   const values = [userId];
   for (const [key, col] of Object.entries(cols)) {
     if (patch[key] === undefined) continue;
-    values.push(key === 'budgets' || key === 'openingBalances' ? JSON.stringify(patch[key]) : patch[key]);
+    values.push(['budgets', 'openingBalances', 'creditCards'].includes(key) ? JSON.stringify(patch[key]) : patch[key]);
     sets.push(`${col} = $${values.length}`);
   }
   if (!sets.length) return load(userId);

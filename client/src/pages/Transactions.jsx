@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api, pendingWrites } from '../lib/api.js';
 import { useApi, useStore } from '../lib/store.jsx';
 import { money, moneyRound, monthLabel, dayLabel, fullDayLabel } from '../lib/format.js';
@@ -19,7 +20,9 @@ const TYPES = [
 export default function Transactions() {
   const { month, currency, openAdd, openMonthSheet, day, settings, allTime, showAllTime } = useStore();
   const [kind, setKind] = useState('');
-  const [method, setMethod] = useState('');
+  // A card's own sheet opens the ledger on that card: ?wallet=HDFC.
+  const [params] = useSearchParams();
+  const [method, setMethod] = useState(() => params.get('wallet') || '');
   const [q, setQ] = useState('');
 
   const wallets = settings?.methods?.length ? settings.methods : ['Cash', 'UPI', 'Bank', 'Card'];
@@ -29,12 +32,15 @@ export default function Transactions() {
      sheet uses, and it re-runs on every write, so the figures never go stale.
      No deps: balances are all-time and never depend on the filters below. */
   const { data: walletData } = useApi(() => api.wallets(), []);
-  const balanceOf = (name) => walletData?.wallets?.find((w) => w.name === name)?.balance;
-  /* One wallet shows its own balance; "All wallets" shows what they add up to,
-     which is the same figure the dashboard calls the balance. */
+  const walletNamed = (name) => walletData?.wallets?.find((w) => w.name === name);
+  const balanceOf = (name) => walletNamed(name)?.balance;
+  /* One wallet shows its own balance; "All wallets" shows the cash they hold,
+     which is the same figure the dashboard calls the balance. A credit card
+     says what is owed on it instead — it is the bank's money, not yours. */
+  const picked = method ? walletNamed(method) : null;
   const shown = method
     ? balanceOf(method)
-    : walletData?.wallets?.reduce((n, w) => n + w.balance, 0);
+    : walletData?.wallets?.filter((w) => !w.credit).reduce((n, w) => n + w.balance, 0);
 
   const { data, loading } = useApi(
     () => api.transactions({
@@ -123,18 +129,18 @@ export default function Transactions() {
             {/* Exact beside the label, rounded inside the list — a dropdown row
                 on a narrow phone has no room for paise. */}
             {shown !== undefined && (
-              <span className={`field-note${shown < 0 ? ' field-note--neg' : ''}`}>
-                {money(shown, currency)}{method ? '' : ' in all'}
+              <span className={`field-note${shown < 0 && !picked?.credit ? ' field-note--neg' : ''}`}>
+                {picked?.credit ? `${money(picked.owed, currency)} owed` : `${money(shown, currency)}${method ? '' : ' in all'}`}
               </span>
             )}
           </label>
           <select id="f-method" className="input" value={method} onChange={(e) => setMethod(e.target.value)}>
             <option value="">All wallets</option>
             {wallets.map((m) => {
-              const b = balanceOf(m);
+              const w = walletNamed(m);
               return (
                 <option key={m} value={m}>
-                  {b === undefined ? m : `${m} · ${moneyRound(b, currency)}`}
+                  {!w ? m : w.credit ? `${m} · ${moneyRound(w.owed, currency)} owed` : `${m} · ${moneyRound(w.balance, currency)}`}
                 </option>
               );
             })}

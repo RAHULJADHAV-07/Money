@@ -122,6 +122,17 @@ export function effectsBefore(userId, { from, method }) {
   return many(`select t.kind, t.amount, t.method, t.to_method from transactions t where ${where}`, values);
 }
 
+/* Every entry that touched any of these wallets, oldest first -- a credit
+   card's bills are worked out from exactly these. Four columns plus the date:
+   this can be years of swipes. */
+export const touching = (userId, wallets) =>
+  many(
+    `select date, kind, amount, method, to_method from transactions
+      where user_id = $1 and (method = any($2) or (kind = 'transfer' and to_method = any($2)))
+      order by date asc, created_at asc`,
+    [userId, wallets]
+  );
+
 export const allForExport = (userId) =>
   many(`${SELECT} where t.user_id = $1 order by t.date asc, t.created_at asc`, [userId]);
 

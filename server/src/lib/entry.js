@@ -4,6 +4,7 @@ import * as Settings from '../models/Settings.js';
 import { KINDS } from './kinds.js';
 import { openingsFor, balancesFrom, walletSpend } from './wallets.js';
 import { toDayKey } from './dates.js';
+import { cardsOf, availableIn } from './credit.js';
 
 /*
  * The rules an entry has to satisfy, wherever it comes from.
@@ -66,16 +67,30 @@ export async function walletBalances(userId, { excludeId = null, excludeGroupId 
     Transaction.walletMovement(userId, excludeId, excludeGroupId),
     Transaction.walletTransferIn(userId, excludeId),
   ]);
+  const json = Settings.toJSON(settings);
   return {
     currency: settings.currency || '',
-    balances: balancesFrom({ openings: openingsFor(Settings.toJSON(settings)), movement, transferIn }),
+    balances: balancesFrom({ openings: openingsFor(json), movement, transferIn }),
+    cards: cardsOf(json),
   };
 }
 
 /* The message names the way out: an empty wallet usually means the opening
    balance was never set, not that there is genuinely no money. */
-export function shortfall(wallet, available, needed, currency) {
+export function shortfall(wallet, available, needed, currency, card = null) {
   const money = (n) => `${currency}${paise(n)}`;
+  /* A card is never "empty" -- it has a limit, and the way out is a payment
+     into it, or a higher limit if the bank has raised it. */
+  if (card) {
+    return Object.assign(
+      new Error(
+        `${wallet} has ${money(Math.max(0, available))} of credit left on a ${money(card.limit)} limit. ` +
+        `This entry needs ${money(needed)}. Pay some of the card off first, pick another wallet, ` +
+        `or if the bank raised your limit, update it in Settings → Wallets.`
+      ),
+      { status: 400, code: 'CREDIT_LIMIT', wallet, available, needed }
+    );
+  }
   const detail = available <= NEAR_ZERO ? `${wallet} is empty.` : `${wallet} only has ${money(available)}.`;
   return Object.assign(
     new Error(
@@ -88,7 +103,8 @@ export function shortfall(wallet, available, needed, currency) {
 }
 
 /*
- * You cannot spend from a wallet what it does not hold.
+ * You cannot spend from a wallet what it does not hold -- or, for a credit
+ * card, more than is left of its limit.
  *
  * The wallet balance is the one shown on the dashboard, so a refusal here always
  * matches what the app is displaying. Editing an entry measures against the
@@ -99,9 +115,9 @@ export async function assertWalletCovers(userId, doc, excludeId = null) {
   const spend = walletSpend(doc);
   if (spend <= 0) return;
 
-  const { currency, balances } = await walletBalances(userId, { excludeId });
+  const { currency, balances, cards } = await walletBalances(userId, { excludeId });
   const wallet = doc.method || 'Cash';
-  const available = balances[wallet] || 0;
+  const available = availableIn(wallet, balances, cards);
   if (spend <= available + NEAR_ZERO) return;
-  throw shortfall(wallet, available, spend, currency);
+  throw shortfall(wallet, available, spend, currency, cards[wallet]);
 }

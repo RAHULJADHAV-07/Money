@@ -62,6 +62,9 @@ export const IconAuto = () => (
 export const IconWallet = () => (
   <Icon><rect x="3" y="5.6" width="18" height="12.8" rx="3.2" /><path d="M3 9.8h18" /><circle cx="16.8" cy="14.2" r="1.3" /></Icon>
 );
+export const IconCard = () => (
+  <Icon><rect x="2.8" y="5.4" width="18.4" height="13.2" rx="2.6" /><path d="M2.8 9.6h18.4" strokeWidth="2.4" /><path d="M6.4 15h3.6" /></Icon>
+);
 export const IconTarget = () => <Icon><circle cx="12" cy="12" r="8.2" /><circle cx="12" cy="12" r="4" /><circle cx="12" cy="12" r="1" strokeWidth="2.2" /></Icon>;
 export const IconSwap = () => <Icon><path d="M4 8.4h13.2l-3.4-3.4" /><path d="M20 15.6H6.8l3.4 3.4" /></Icon>;
 export const IconDebt = () => (

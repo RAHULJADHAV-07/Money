@@ -1598,7 +1598,7 @@ select.input option {
   }
   /* Wallets and the four tiles read across the full width; below them the
      spend breakdown and the recent list sit side by side. */
-  .g-wallets, .g-routines, .g-tiles { grid-column: 1 / -1; }
+  .g-wallets, .g-cards, .g-routines, .g-tiles { grid-column: 1 / -1; }
   .g-cats { grid-column: 1; }
   .g-recent { grid-column: 2; }
 
@@ -2533,3 +2533,146 @@ select.input option {
   color: var(--accent);
 }
 .release-tick svg { width: 11px; height: 11px; }
+
+/* ═══ Credit cards ═════════════════════════════════════════════════════════
+   A card is a wallet cut from the same cloth as the others — the accent
+   family, white type — but it holds a debt, so it shows what is owed, how
+   much of the limit that is, and the one line about its bill that matters
+   today. Due-soon is amber and overdue is red; nothing else is alarmed. */
+.tone-text-warn { color: color-mix(in oklab, var(--warn) 82%, var(--ink)); }
+.badge--warn { background: color-mix(in oklab, var(--warn) var(--tint-strong), var(--surface)); color: color-mix(in oklab, var(--warn) 80%, var(--ink)); }
+.badge--save { background: color-mix(in oklab, var(--save) var(--tint), var(--surface)); color: var(--save); }
+.badge--flat { background: var(--surface-3); color: var(--ink-3); }
+.tone-bg-in   { background: var(--in); }
+.tone-bg-warn { background: var(--warn); }
+.tone-bg-out  { background: var(--out); }
+.tone-bg-flat { background: var(--ink-3); }
+
+.note-box > svg { width: 16px; height: 16px; flex: none; margin-top: 1px; }
+.note-box--warn {
+  background: color-mix(in oklab, var(--warn) var(--tint), var(--surface));
+  color: color-mix(in oklab, var(--warn) 62%, var(--ink));
+}
+
+.cc-rail {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+}
+.ccard {
+  display: block; width: 100%; min-width: 0; text-align: left;
+  padding: 15px 15px 14px; border-radius: var(--r-lg);
+  color: #fff; position: relative; overflow: hidden;
+  background:
+    radial-gradient(140% 120% at 100% 0%, rgba(255, 255, 255, .14), transparent 55%),
+    linear-gradient(135deg, color-mix(in oklab, var(--wc) 88%, #000), color-mix(in oklab, var(--wc) 45%, #000));
+  box-shadow: var(--e2);
+  transition: transform .15s var(--ease);
+}
+button.ccard:active { transform: scale(.98); }
+/* The faint arc every plastic card has — decoration, and it tells a card from
+   a wallet at a glance without a word. */
+.ccard::after {
+  content: ''; position: absolute; right: -44px; bottom: -64px; width: 170px; height: 170px;
+  border-radius: 50%; border: 22px solid rgba(255, 255, 255, .07); pointer-events: none;
+}
+.ccard > * { position: relative; z-index: 1; }
+.ccard-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ccard-chip {
+  display: inline-flex; align-items: center; gap: 5px; flex: none;
+  font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  padding: 3px 8px 3px 6px; border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, .16);
+}
+.ccard-chip svg { width: 13px; height: 13px; }
+.ccard-k { display: block; font-size: 10.5px; font-weight: 600; opacity: .78; margin-top: 12px; }
+.ccard .wbal { margin-top: 2px; }
+.ccard .wflow { margin-top: 7px; }
+.ccard-bill {
+  display: block; margin-top: 11px; padding: 7px 10px;
+  font-size: 11.5px; font-weight: 600; line-height: 1.4;
+  border-radius: var(--r-xs); background: rgba(0, 0, 0, .22);
+}
+.ccard-bill--warn { background: color-mix(in oklab, var(--warn) 70%, #000); }
+.ccard-bill--out  { background: color-mix(in oklab, var(--out) 78%, #000); }
+.ccard-bill--in::before { content: '✓ '; }
+.ccard--big { padding: 18px; margin-bottom: 6px; }
+.ccard--big .wbal { font-size: 30px; }
+.ccard-foot {
+  display: flex; justify-content: space-between; gap: 10px;
+  font-size: 11.5px; font-weight: 580; opacity: .9; margin-top: 8px;
+}
+
+.cc-bar {
+  display: block; height: 6px; margin-top: 12px; border-radius: var(--r-pill);
+  background: var(--track); overflow: hidden;
+}
+.cc-bar--dark { background: rgba(255, 255, 255, .2); }
+.cc-bar-fill { display: block; height: 100%; border-radius: inherit; transition: width .4s var(--ease); }
+.cc-bar--dark .tone-bg-in { background: #7ff0c2; }
+.cc-bar--dark .tone-bg-warn { background: #ffd27a; }
+.cc-bar--dark .tone-bg-out { background: #ffab98; }
+
+.cc-section { padding: 16px 0 4px; border-bottom: 1px solid var(--line); }
+.cc-section:last-of-type { border-bottom: none; }
+.cc-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.cc-title { font-size: 15px; font-weight: 650; letter-spacing: -.02em; }
+.cc-sub { font-size: 12px; color: var(--ink-3); }
+.cc-line { font-size: 13px; font-weight: 580; margin-top: 6px; line-height: 1.45; }
+.cc-section .kv-grid { margin-top: 12px; }
+.cc-section .kv { background: var(--surface-2); }
+.cc-pay { display: grid; gap: 8px; margin: 14px 0; }
+.cc-section .note-box { margin: 0 0 14px; }
+
+.cc-tip {
+  display: flex; gap: 11px; align-items: flex-start;
+  margin: 10px 0 14px; padding: 12px; border-radius: var(--r-sm);
+  background: var(--surface-2); border: 1px solid var(--line);
+}
+.cc-tip b { display: block; font-size: 13px; font-weight: 640; }
+.cc-tip span span { display: block; font-size: 11.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.5; }
+
+.cc-hist {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--line);
+}
+.cc-hist:last-child { border-bottom: none; }
+.cc-hist-body { flex: 1; min-width: 0; }
+.cc-hist-body b { display: block; font-size: 13.5px; font-weight: 620; }
+.cc-hist-body span {
+  display: block; font-size: 11px; color: var(--ink-3); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cc-hist-amt { font-size: 13.5px; font-weight: 640; flex: none; }
+
+.cc-links { display: grid; gap: 8px; margin-top: 14px; }
+.cc-link {
+  width: 100%; text-align: left; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface);
+}
+
+/* Settings: each wallet, with the switch that makes it a card and, once it is
+   one, the terms it runs on in a panel underneath. */
+.wallet-set { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+.wallet-set .num-row { border-bottom: none; }
+.wallet-set.is-card .num-row-k { font-weight: 650; }
+.cc-check { margin: 0 0 6px; padding: 0 0 4px; background: none; border: none; border-radius: 0; align-items: center; }
+.cc-check input { margin-top: 0; }
+.cc-check .check-body b { font-weight: 580; color: var(--ink-2); }
+.cc-terms {
+  margin: 4px 0 10px; padding: 6px 12px 12px;
+  border-radius: var(--r-sm); background: var(--surface-2); border: 1px solid var(--line);
+}
+.cc-terms .num-row { border-bottom: 1px solid var(--line); }
+.cc-terms .num-row-field { background: var(--surface); }
+.cc-days { margin-top: 12px; }
+.cc-days .field { margin-bottom: 0; }
+.cc-days select.input { font-size: 13px; }
+.suffix-field {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+  padding-right: 12px;
+}
+.suffix-field:focus-within { border-color: var(--accent); }
+.suffix-field .input { border: none; background: none; min-width: 0; }
+.suffix-field .input:focus { box-shadow: none; }
+.suffix-field span { font-size: 12px; color: var(--ink-3); white-space: nowrap; }
