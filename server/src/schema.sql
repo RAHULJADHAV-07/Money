@@ -173,3 +173,12 @@ create index if not exists routines_user_idx on routines (user_id, archived, cre
    Added as ALTERs so a database made by an earlier version picks them up. */
 alter table routines add column if not exists starts_on date;
 alter table routines add column if not exists ends_on   date;
+
+/* ── Credit cards ──────────────────────────────────────────────────────────
+   Which wallets are credit cards, and the terms each one runs on: the limit,
+   the day the statement is made up, the day it must be paid by, the yearly
+   interest and the minimum-due rule. Keyed by wallet name, like the opening
+   balances beside it. A card's opening balance is negative when you started
+   out already owing on it. Added as an ALTER so an existing database picks it
+   up on its next boot. */
+alter table settings add column if not exists credit_cards jsonb not null default '{}'::jsonb;

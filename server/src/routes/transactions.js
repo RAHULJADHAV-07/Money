@@ -8,6 +8,7 @@ import {
   assertOwnGoal, walletBalances, shortfall, assertWalletCovers,
 } from '../lib/entry.js';
 import { toDayKey, dayKey, monthRange } from '../lib/dates.js';
+import { availableIn } from '../lib/credit.js';
 import { wrap } from '../lib/async.js';
 
 const router = Router();
@@ -94,11 +95,11 @@ async function assertGroupCovers(userId, group, excludeGroupId = null) {
   const short = drains(group.parts);
   if (!short.length) return;
 
-  const { currency, balances } = await walletBalances(userId, { excludeGroupId });
+  const { currency, balances, cards } = await walletBalances(userId, { excludeGroupId });
   for (const [wallet, d] of short) {
-    const available = balances[wallet] || 0;
+    const available = availableIn(wallet, balances, cards);
     if (-d <= available + NEAR_ZERO) continue;
-    throw shortfall(wallet, available, -d, currency);
+    throw shortfall(wallet, available, -d, currency, cards[wallet]);
   }
 }
 

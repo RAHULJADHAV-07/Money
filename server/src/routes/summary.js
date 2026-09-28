@@ -5,6 +5,7 @@ import { KINDS, dirOf, debtNet } from '../lib/kinds.js';
 import { openingsFor, balancesFrom } from '../lib/wallets.js';
 import { monthRange, lastMonths, toDayKey, dayKey, startOfToday } from '../lib/dates.js';
 import { wrap } from '../lib/async.js';
+import { cardsOf, availableIn } from '../lib/credit.js';
 
 const router = Router();
 
@@ -89,11 +90,29 @@ router.get('/', wrap(async (req, res) => {
     walletOf(r.to_method).monthIn += r.total;
   }
 
+  /* A credit card is a wallet too, but what it holds is the bank's money: it
+     sits below zero by what you owe. Marked here so the dashboard can keep it
+     out of the cash in your hand and show it as the debt it is. */
+  const cardTerms = cardsOf(settings);
+  for (const w of Object.values(wallet)) {
+    const card = cardTerms[w.name];
+    if (!card) continue;
+    w.credit = true;
+    w.limit = card.limit;
+    w.owed = Math.max(0, -w.balance);
+  }
+
   const wallets = Object.values(wallet).sort((a, b) => b.balance - a.balance || a.name.localeCompare(b.name));
   const walletTotal = wallets.reduce((n, w) => n + w.balance, 0);
 
-  // Cash in hand: opening balance plus every entry's signed effect.
-  const balance = allTime.reduce((n, r) => n + (KINDS[r.kind]?.dir ?? 0) * r.total, openingTotal);
+  // Every wallet together: opening balance plus every entry's signed effect.
+  const everything = allTime.reduce((n, r) => n + (KINDS[r.kind]?.dir ?? 0) * r.total, openingTotal);
+  /* Cash in hand leaves the cards out. Spending on a card does not take money
+     from your hand -- it adds to what you owe the bank, which is counted below
+     and comes off net worth instead. Paying the bill is what moves cash. */
+  const cardBalance = wallets.filter((w) => w.credit).reduce((n, w) => n + w.balance, 0);
+  const balance = everything - cardBalance;
+  const cardDue = wallets.filter((w) => w.credit).reduce((n, w) => n + w.owed, 0);
   const savings = get(all, 'saving_in') - get(all, 'saving_out');
 
   // Nets are computed per person first, so one settled friend never masks another's dues.
@@ -132,7 +151,9 @@ router.get('/', wrap(async (req, res) => {
       savings,
       toReceive,
       toPay,
-      netWorth: balance + savings + toReceive - toPay,
+      cardDue,
+      // cardBalance is negative by what the cards owe, and positive if overpaid.
+      netWorth: balance + cardBalance + savings + toReceive - toPay,
     },
     today: {
       date: today,
@@ -184,10 +205,23 @@ router.get('/wallets', wrap(async (req, res) => {
   const settings = Settings.toJSON(settingsRow);
   const balances = balancesFrom({ openings: openingsFor(settings), movement, transferIn });
   const names = [...new Set([...(settings.methods || []), ...Object.keys(balances)])];
+  const cards = cardsOf(settings);
 
+  /* `available` is what the wallet can still pay out -- its balance, or for a
+     card the credit left, and null for a card with no limit set, which has
+     nothing to be measured against. */
   res.json({
     currency: settings.currency,
-    wallets: names.map((name) => ({ name, balance: balances[name] || 0 })),
+    wallets: names.map((name) => {
+      const balance = balances[name] || 0;
+      if (!cards[name]) return { name, balance, available: balance };
+      const left = availableIn(name, balances, cards);
+      return {
+        name, balance, credit: true, limit: cards[name].limit,
+        owed: Math.max(0, -balance),
+        available: Number.isFinite(left) ? left : null,
+      };
+    }),
   });
 }));
 

@@ -80,7 +80,7 @@ From that one list everything else is derived:
 - **Savings** = saved − withdrawn
 - **To receive** = lent − got back, *per person* (one settled friend never hides another's dues)
 - **To pay** = borrowed − paid back, per person
-- **Net worth** = balance + savings + to receive − to pay
+- **Net worth** = balance + savings + to receive − to pay (− card dues, below)
 - **Each wallet** (Cash / UPI / Bank / Card) = its opening figure + everything that
   touched it + transfers in − transfers out. The wallets always add up to the balance.
 
@@ -89,6 +89,31 @@ someone owes drops but your balance does not. A transfer shifts money between yo
 own wallets, so the per-wallet figures change and the total stays put.
 
 Because it is one ledger, nothing can drift out of sync the way separate sheets do.
+
+### Credit cards
+
+Any wallet can be marked as a credit card (**Settings → Wallets**), with a limit,
+a statement day, a due day, a yearly interest rate and a minimum-due rule. A card
+runs the other way from a wallet: it sits **below zero by what you owe**.
+
+| You do | Log it as | What happens |
+|---|---|---|
+| Swipe the card | Expense, paid from the card | Counted as spending that day; the card's debt grows. Cash in hand is untouched |
+| Pay the bill | Transfer, Bank → card | Cash goes down, the debt goes down. Not an expense, so nothing is counted twice |
+| Get a refund | Income, received in the card | The debt goes down |
+| Withdraw cash | Transfer, card → Cash | Allowed, with a warning: interest starts that day |
+
+- **Balance in hand** leaves the cards out. **Card dues** = what every card owes.
+- **Net worth** = balance + savings + to receive − to pay − card dues.
+- A card cannot be taken past its limit (with no limit set, it is not checked).
+
+Each card's bill is worked out from its own entries in
+[server/src/lib/credit.js](server/src/lib/credit.js): the cycle runs from the
+day after one statement to the next; the **statement balance** is what was owed
+at the end of that day; the **minimum due** is the larger of the minimum-due
+percentage and ₹200, never more than the bill; payments count from the day after
+the statement. A bill is *paid*, *minimum paid*, *due*, *carried* (the due date
+passed with the minimum met, so interest is running) or *overdue*.
 
 ## Accounts
 

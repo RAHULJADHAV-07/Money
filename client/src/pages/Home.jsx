@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { useApi, useStore } from '../lib/store.jsx';
 import { moneyRound, money, moneyParts, compact, todayKey, monthKeyNow, monthShort } from '../lib/format.js';
 import TxList from '../components/TxList.jsx';
+import CardSheet, { CardFace } from '../components/CardSheet.jsx';
 import Alert from '../components/Alert.jsx';
 import { CategoryBars } from '../components/Charts.jsx';
 import { walletHue } from '../lib/palette.js';
@@ -71,6 +72,12 @@ export default function Home() {
   const [ask, setAsk] = useState(null);      // the routine awaiting a yes
   const [alert, setAlert] = useState(null);
   const [running, setRunning] = useState(false);
+  const [openCard, setOpenCard] = useState(null);   // the card whose bill is open
+  /* Only asked for when some wallet is a card. An API a release behind has no
+     /cards yet; the section then simply does not appear. */
+  const hasCards = Object.keys(settings?.creditCards || {}).length > 0;
+  const cardData = useApi(() => (hasCards ? api.cards(todayKey()) : Promise.resolve({ cards: [] })), [hasCards]).data;
+  const creditCards = cardData?.cards || [];
 
   /* Nothing is written until you say yes, and the confirmation names the amount
      and where it lands -- a one-tap button is only safe if it cannot be tapped
@@ -85,7 +92,8 @@ export default function Home() {
     } catch (err) {
       setAsk(null);
       setAlert({
-        title: err.code === 'INSUFFICIENT_FUNDS' ? 'Not enough in that wallet' : 'Could not add it',
+        title: err.code === 'INSUFFICIENT_FUNDS' ? 'Not enough in that wallet'
+          : err.code === 'CREDIT_LIMIT' ? 'Over the card limit' : 'Could not add it',
         message: err.message,
       });
     } finally { setRunning(false); }
@@ -102,7 +110,9 @@ export default function Home() {
   if (loading && !data) return <Skeleton />;
 
   const { cards, today, byCategory, recent, wallets = [] } = data;
-  const activeWallets = wallets.filter((w) => w.balance !== 0 || w.in !== 0 || w.out !== 0);
+  // Cards have a section of their own below: what they hold is not yours.
+  const activeWallets = wallets.filter((w) => !w.credit && (w.balance !== 0 || w.in !== 0 || w.out !== 0));
+  const cardDue = cards.cardDue || 0;
   const noData = !recent.length;
 
   return (
@@ -110,6 +120,7 @@ export default function Home() {
       <section className="hero" data-tour="balance">
         <div className="hero-top">
           <span className="hero-label">Balance in hand</span>
+          {cardDue > 0 && <span className="hero-chip hero-chip--static">{moneyRound(cardDue, currency)} on cards</span>}
         </div>
 
         <HeroAmount value={cards.balance} currency={currency} />
@@ -165,6 +176,20 @@ export default function Home() {
             </section>
           )}
 
+          {creditCards.length > 0 && (
+            <section className="g-cards">
+              <div className="section-label">
+                Credit cards
+                {cardDue > 0 && <span className="section-count num">{moneyRound(cardDue, currency)} owed</span>}
+              </div>
+              <div className="cc-rail">
+                {creditCards.map((c) => (
+                  <CardFace key={c.name} card={c} currency={currency} order={walletOrder} onOpen={() => setOpenCard(c.name)} />
+                ))}
+              </div>
+            </section>
+          )}
+
           {routines.length > 0 && !apiBehind && (
             <section className="routines g-routines">
               <div className="section-label">One tap</div>
@@ -210,7 +235,7 @@ export default function Home() {
               <span className="tile-ico tone-flat"><IconWallet /></span>
               <span className="tile-k">Net worth</span>
               <span className="tile-v num">{moneyRound(cards.netWorth, currency)}</span>
-              <span className="tile-note">wallets, savings, dues</span>
+              <span className="tile-note">{cardDue > 0 ? 'wallets, savings, dues, cards' : 'wallets, savings, dues'}</span>
             </button>
           </div>
 
@@ -261,6 +286,14 @@ export default function Home() {
       )}
 
       {alert && <Alert title={alert.title} message={alert.message} onClose={() => setAlert(null)} />}
+
+      {openCard && creditCards.some((c) => c.name === openCard) && (
+        <CardSheet
+          card={creditCards.find((c) => c.name === openCard)}
+          wallets={wallets}
+          onClose={() => setOpenCard(null)}
+        />
+      )}
     </>
   );
 }

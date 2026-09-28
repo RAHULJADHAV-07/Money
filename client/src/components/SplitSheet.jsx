@@ -196,13 +196,21 @@ export default function SplitSheet() {
     if (!wallets || !derived) return null;
     const net = derived.received - derived.paid;
     if (net >= -0.005) return null;
-    const have = wallets.find((w) => w.name === form.method)?.balance ?? 0;
-    return -net > have + 0.005 ? { name: form.method, have, needs: -net } : null;
+    const w = wallets.find((x) => x.name === form.method);
+    // A card is measured against its credit left; a card with no limit, never.
+    const have = w && 'available' in w ? w.available : (w?.balance ?? 0);
+    if (have === null) return null;
+    return -net > have + 0.005 ? { name: form.method, have, needs: -net, card: !!w?.credit } : null;
   }, [wallets, derived, form]);
 
   async function save() {
     if (shortWallet) {
-      setAlert({
+      setAlert(shortWallet.card ? {
+        title: `Over the ${shortWallet.name} limit`,
+        message:
+          `${shortWallet.name} has ${money(Math.max(0, shortWallet.have))} of credit left. This needs ${money(shortWallet.needs)}. ` +
+          'Pay some of the card off first, or pick another wallet.',
+      } : {
         title: `Not enough in ${shortWallet.name}`,
         message:
           `${shortWallet.have <= 0.005 ? `${shortWallet.name} is empty.` : `${shortWallet.name} only has ${money(shortWallet.have)}.`} ` +
@@ -230,6 +238,7 @@ export default function SplitSheet() {
       closeSplit();
     } catch (err) {
       if (err.code === 'INSUFFICIENT_FUNDS') setAlert({ title: 'Not enough in that wallet', message: err.message });
+      else if (err.code === 'CREDIT_LIMIT') setAlert({ title: 'Over the card limit', message: err.message });
       else setError(err.message);
       setSaving(false);
     }
@@ -557,7 +566,7 @@ export default function SplitSheet() {
 
       {shortWallet && (
         <p className="field-warn" role="status">
-          {shortWallet.name} has {money(shortWallet.have)} — this needs {money(shortWallet.needs)}.
+          {shortWallet.name} has {money(Math.max(0, shortWallet.have))}{shortWallet.card ? ' of credit left' : ''} — this needs {money(shortWallet.needs)}.
         </p>
       )}
 

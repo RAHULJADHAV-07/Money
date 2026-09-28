@@ -13,6 +13,7 @@ import goals from './routes/goals.js';
 import routines from './routes/routines.js';
 import settings from './routes/settings.js';
 import exportRoutes from './routes/export.js';
+import cards from './routes/cards.js';
 import { requireAuth } from './lib/auth.js';
 import { startKeepAlive } from './lib/keepalive.js';
 import { mailEnabled, sender } from './lib/mail.js';
@@ -68,6 +69,7 @@ app.use('/api/goals', requireAuth, goals);
 app.use('/api/routines', requireAuth, routines);
 app.use('/api/settings', requireAuth, settings);
 app.use('/api/export', requireAuth, exportRoutes);
+app.use('/api/cards', requireAuth, cards);
 
 // When running as one box (npm start), the API also serves the built PWA.
 const clientDist = path.resolve(__dirname, '../../client/dist');

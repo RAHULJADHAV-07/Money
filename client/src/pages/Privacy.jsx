@@ -25,7 +25,7 @@ const SECTIONS = [
       ['What you record', [
         'The entries you add: amount, date, type, category or source, the name you type for someone you lent to or borrowed from, notes, and which wallet the money moved through.',
         'Your savings buckets and their targets.',
-        'Your settings: currency, categories, sources, wallets, budgets and opening balances.',
+        'Your settings: currency, categories, sources, wallets, budgets and opening balances — and, for any wallet you mark as a credit card, the limit, statement and due days, interest rate and minimum-due rule you type in. No card numbers are ever asked for or stored.',
       ]],
       ['Technical records', [
         'Our hosting providers keep ordinary server logs, which include IP addresses and request times. These are used to keep the service running and to investigate faults.',

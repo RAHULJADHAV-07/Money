@@ -162,6 +162,9 @@ export const api = {
   updateRoutine: (id, body) => put(`/routines/${id}`, body),
   deleteRoutine: (id) => del(`/routines/${id}`),
   runRoutine: (id, body) => post(`/routines/${id}/run`, body || {}),
+  /* Every credit card with its bill worked out as of the device's today --
+     statement, minimum, due date, cycle and past statements. */
+  cards: (today) => get(`/cards${today ? `?today=${today}` : ''}`),
   goals: () => get('/goals'),
   createGoal: (body) => post('/goals', body),
   updateGoal: (id, body) => put(`/goals/${id}`, body),

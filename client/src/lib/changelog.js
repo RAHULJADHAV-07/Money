@@ -10,6 +10,18 @@ import { isNewer } from './version.js';
 
 export const CHANGELOG = [
   {
+    version: '2.4.0',
+    title: 'Credit cards that work like credit cards',
+    changes: [
+      'Any wallet can now be a credit card. More → Wallets has a tick box under each one; tick it and tell the app your limit, the day your statement is made up, the day the bill is due, and the interest rate. If you already owed something when you started, put that in too.',
+      'Spending on a card no longer comes out of your balance in hand — because it does not. It adds to what you owe the bank, which shows on its own card on the home screen and comes off your net worth. Your spending by category still counts it the day you swiped, so where your money went stays true.',
+      'Each card shows its bill the way the bank prints it: the statement amount, the minimum due, the due date, what you have paid since and what is left. It tells you when a bill is due soon, when only the minimum was paid and interest is running, and when it is overdue.',
+      'Pay the bill straight from the card — full amount, minimum, or anything else. It is logged as a transfer from your bank into the card, not as spending, so nothing is ever counted twice.',
+      'See what you have spent in the cycle that has not been billed yet, how many interest-free days a purchase today gets, the best day of the month to buy, and your last six statements with whether each one was paid in full.',
+      'A card can no longer be taken past its limit, and a cash withdrawal from one warns you that interest starts the same day.',
+    ],
+  },
+  {
     version: '2.3.0',
     title: 'A proper welcome, a way back in, and colours that agree with each other',
     changes: [

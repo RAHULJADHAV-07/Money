@@ -98,6 +98,9 @@ export default function AddSheet() {
       if (addSheet?.goal) setGoal(addSheet.goal);
       if (addSheet?.amount) setAmount(String(addSheet.amount));
       if (addSheet?.note) setNote(addSheet.note);
+      // Paying a card bill arrives with both wallets already chosen.
+      if (addSheet?.method) setMethod(addSheet.method);
+      if (addSheet?.toMethod) setToMethod(addSheet.toMethod);
     }
   }, [editing, addSheet]);
 
@@ -145,21 +148,36 @@ export default function AddSheet() {
      never be short; a transfer does leave its wallet even though its direction
      is neutral overall. While the balances are still loading `available` is
      null, and nothing is blocked on a guess. */
-  const available = wallets ? (wallets.find((w) => w.name === effMethod)?.balance ?? 0) : null;
+  /* A credit card is measured against the credit it has left rather than what
+     it holds — which is below zero by design. `available` is null for a card
+     with no limit set: there is nothing to be short of. */
+  const walletOf = (name) => wallets?.find((w) => w.name === name);
+  const payingWallet = walletOf(effMethod);
+  const payingCard = !!payingWallet?.credit;
+  const toWallet = needs === 'transfer' ? walletOf(effToMethod) : null;
+  const available = !wallets ? null
+    : payingWallet && 'available' in payingWallet ? payingWallet.available
+    : (payingWallet?.balance ?? 0);
   const spend = (needs === 'transfer' || dirOf(kind) < 0) ? Number(amount) || 0 : 0;
   const takesFromWallet = spend > 0 && available !== null;
   const short = takesFromWallet && spend > available + 0.005;
+  const walletNote = payingCard
+    ? (available === null ? 'no limit set' : `${money(available, currency)} credit left`)
+    : `${money(available, currency)} available`;
 
   // An empty wallet usually means the opening balance was never set, rather
   // than that there is genuinely nothing there — so the way out is named.
-  const shortMessage = () =>
-    `${available <= 0.005 ? `${effMethod} is empty.` : `${effMethod} only has ${money(available, currency)}.`} ` +
-    `This entry needs ${money(spend, currency)}. Pick another wallet, or if ${effMethod} already held money ` +
-    `before you started logging here, set its opening balance in Settings → Wallets.`;
+  const shortMessage = () => payingCard
+    ? `${effMethod} has ${money(Math.max(0, available), currency)} of credit left on a ${money(payingWallet.limit, currency)} limit. ` +
+      `This entry needs ${money(spend, currency)}. Pay some of the card off first, pick another wallet, or if the bank ` +
+      `raised your limit, update it in Settings → Wallets.`
+    : `${available <= 0.005 ? `${effMethod} is empty.` : `${effMethod} only has ${money(available, currency)}.`} ` +
+      `This entry needs ${money(spend, currency)}. Pick another wallet, or if ${effMethod} already held money ` +
+      `before you started logging here, set its opening balance in Settings → Wallets.`;
 
   async function save() {
     if (short) {
-      setAlert({ title: `Not enough in ${effMethod}`, message: shortMessage() });
+      setAlert({ title: payingCard ? `Over the ${effMethod} limit` : `Not enough in ${effMethod}`, message: shortMessage() });
       return;
     }
     setSaving(true);
@@ -182,6 +200,7 @@ export default function AddSheet() {
       // The server checks the same rule; if it refuses (stale balances, or a
       // queued entry replayed later) say so the same way rather than inline.
       if (err.code === 'INSUFFICIENT_FUNDS') setAlert({ title: 'Not enough in that wallet', message: err.message });
+      else if (err.code === 'CREDIT_LIMIT') setAlert({ title: 'Over the card limit', message: err.message });
       else setError(err.message);
       setSaving(false);
     }
@@ -263,9 +282,11 @@ export default function AddSheet() {
         </div>
         {short && (
           <p className="field-warn" role="status">
-            {available <= 0.005
-              ? `${effMethod} is empty — this needs ${money(spend, currency)}.`
-              : `${effMethod} has ${money(available, currency)} — ${money(spend - available, currency)} short.`}
+            {payingCard
+              ? `${money(spend - available, currency)} over what is left on the ${effMethod} limit.`
+              : available <= 0.005
+                ? `${effMethod} is empty — this needs ${money(spend, currency)}.`
+                : `${effMethod} has ${money(available, currency)} — ${money(spend - available, currency)} short.`}
           </p>
         )}
       </div>
@@ -346,18 +367,44 @@ export default function AddSheet() {
         <div className="row-2">
           <div className="field">
             <label className="field-label" htmlFor="from-mth">
-              From{available !== null && <span className="field-note">{money(available, currency)} in {effMethod}</span>}
+              From{available !== null && (
+                <span className="field-note">{payingCard ? walletNote : `${money(available, currency)} in ${effMethod}`}</span>
+              )}
             </label>
             <select id="from-mth" className="input" value={effMethod} onChange={(e) => setMethod(e.target.value)}>
               {methodOptions.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
           <div className="field">
-            <label className="field-label" htmlFor="to-mth">To</label>
+            <label className="field-label" htmlFor="to-mth">
+              To{toWallet?.credit && toWallet.owed > 0 && (
+                <span className="field-note">{money(toWallet.owed, currency)} owed</span>
+              )}
+            </label>
             <select id="to-mth" className="input" value={effToMethod} onChange={(e) => setToMethod(e.target.value)}>
               {otherMethods.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
+        </div>
+      )}
+
+      {/* The two transfers a credit card makes different, said while they can
+          still be changed. Paying the bill is the one people most often log as
+          an expense, which counts every purchase on it twice. */}
+      {needs === 'transfer' && toWallet?.credit && !payingCard && (
+        <div className="note-box">
+          <span>
+            Paying your {effToMethod} bill. This is not spending — each purchase was already counted when you
+            used the card — so it moves money from {effMethod} to clear what you owe, and your net worth stays the same.
+          </span>
+        </div>
+      )}
+      {needs === 'transfer' && payingCard && (
+        <div className="note-box note-box--warn">
+          <span>
+            A cash withdrawal on a credit card. Banks charge interest on these from the same day, with no
+            interest-free period, and usually a fee of 2.5% or so on top.
+          </span>
         </div>
       )}
 
@@ -378,8 +425,8 @@ export default function AddSheet() {
           <div className="field">
             <label className="field-label" htmlFor="pay-mth">
               {KINDS[kind].dir > 0 ? 'Received in' : 'Paid from'}
-              {available !== null && dirOf(kind) < 0 && (
-                <span className="field-note">{money(available, currency)} available</span>
+              {dirOf(kind) < 0 && (payingCard || available !== null) && wallets && (
+                <span className="field-note">{walletNote}</span>
               )}
             </label>
             <select id="pay-mth" className="input" value={effMethod} onChange={(e) => setMethod(e.target.value)}>
