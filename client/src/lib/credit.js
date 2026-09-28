@@ -50,6 +50,46 @@ export function billLine(st, money) {
   }
 }
 
+/* ── Billing cycles, on 'YYYY-MM-DD' keys ─────────────────────────────────
+   The same calendar rules as server/src/lib/credit.js: a cycle runs from the
+   day after one statement to the next statement date, and day 31 in a short
+   month is its last day. */
+const key = (y, m, d) => new Date(Date.UTC(y, m, d)).toISOString().slice(0, 10);
+const lastDay = (y, m) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+const onDay = (y, m, day) => key(y, m, Math.min(day, lastDay(y, m)));
+const ym = (k) => { const [y, m] = k.split('-').map(Number); return [y, m - 1]; };
+const nextDay = (k) => { const t = new Date(`${k}T00:00:00Z`); t.setUTCDate(t.getUTCDate() + 1); return t.toISOString().slice(0, 10); };
+
+/** The cycle whose statement is made up in `month` ('YYYY-MM') — that month's bill. */
+export function cycleOfMonth(month, statementDay) {
+  const [y, m] = ym(month);
+  return { start: nextDay(onDay(y, m - 1, statementDay)), end: onDay(y, m, statementDay) };
+}
+
+/** The cycle running on `today`: it began the day after the last statement. */
+export function currentCycle(today, statementDay) {
+  const [y, m] = ym(today);
+  const here = onDay(y, m, statementDay);
+  return here < today ? cycleOfMonth(key(y, m + 1, 1).slice(0, 7), statementDay) : cycleOfMonth(today.slice(0, 7), statementDay);
+}
+
+/* What happened on one card across a list of entries: swipes, fees and cash
+   withdrawals go out; payments into it and refunds come in. */
+export function cardFlow(items, card, dirOf) {
+  return items.reduce((f, t) => {
+    if (t.kind === 'transfer') {
+      if (t.method === card) f.out += t.amount;
+      else if (t.toMethod === card) f.in += t.amount;
+      return f;
+    }
+    if (t.method !== card) return f;
+    const d = dirOf(t.kind);
+    if (d < 0) f.out += t.amount;
+    if (d > 0) f.in += t.amount;
+    return f;
+  }, { in: 0, out: 0 });
+}
+
 export const HISTORY_LABEL = {
   paid: ['Paid in full', 'in'],
   min_paid: ['Minimum only', 'warn'],
