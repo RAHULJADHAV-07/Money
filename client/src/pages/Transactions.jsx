@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, pendingWrites } from '../lib/api.js';
 import { useApi, useStore } from '../lib/store.jsx';
-import { money, moneyRound, monthLabel, dayLabel, fullDayLabel } from '../lib/format.js';
+import { money, moneyRound, monthLabel, dayLabel, fullDayLabel, todayKey } from '../lib/format.js';
 import { IconSearch, IconClose, IconChevronRight, IconInbox } from '../components/Icons.jsx';
 import { FlowBar } from '../components/Charts.jsx';
 import TxList from '../components/TxList.jsx';
-import { KINDS } from '../lib/kinds.js';
+import { KINDS, dirOf } from '../lib/kinds.js';
+import { cycleOfMonth, currentCycle, cardFlow } from '../lib/credit.js';
 
 /* Every kind, not a handful of bundles. The old chips grouped them — "Borrow /
    Lend" meant four kinds at once — which made it impossible to ask for just the
@@ -42,15 +43,25 @@ export default function Transactions() {
     ? balanceOf(method)
     : walletData?.wallets?.filter((w) => !w.credit).reduce((n, w) => n + w.balance, 0);
 
+  /* A credit card lives by its billing cycle, not the calendar month. With a
+     card picked, "all time" still lists everything but the totals are this
+     cycle's, back to zero the day after each statement; picking a month means
+     that month's bill — the cycle its statement closes — for the list too. */
+  const terms = method ? settings?.creditCards?.[method] : null;
+  const cycle = terms && !day
+    ? (allTime ? currentCycle(todayKey(), terms.statementDay) : cycleOfMonth(month, terms.statementDay))
+    : null;
+  const billView = !!cycle && !allTime;
+
   const { data, loading } = useApi(
     () => api.transactions({
       limit: 300,
-      ...(day ? { from: day, to: day } : allTime ? {} : { month }),
+      ...(day ? { from: day, to: day } : billView ? { from: cycle.start, to: cycle.end } : allTime ? {} : { month }),
       ...(kind && { kind }),
       ...(method && { method }),
       ...(q && { q }),
     }),
-    [month, day, allTime, kind, method, q]
+    [month, day, allTime, kind, method, q, cycle?.start, cycle?.end]
   );
 
   /* Entries saved while offline aren't on the server yet — show them inline. A
@@ -69,20 +80,39 @@ export default function Transactions() {
     .filter((t) => (!kind || t.kind === kind) && (!method || t.method === method || t.toMethod === method));
 
   const items = [...queued, ...(data?.items || [])];
-  const spent = items.filter((t) => t.kind === 'expense').reduce((n, t) => n + t.amount, 0);
-  const got = items.filter((t) => t.kind === 'income' || t.kind === 'repay_received').reduce((n, t) => n + t.amount, 0);
+  // On a card: only this cycle's entries count towards the bar, whatever is listed.
+  const inCycle = cycle
+    ? items.filter((t) => { const d = String(t.date).slice(0, 10); return d >= cycle.start && d <= cycle.end; })
+    : items;
+  const flow = cycle ? cardFlow(inCycle, method, dirOf) : null;
+  const spent = flow ? flow.out : items.filter((t) => t.kind === 'expense').reduce((n, t) => n + t.amount, 0);
+  const got = flow ? flow.in : items.filter((t) => t.kind === 'income' || t.kind === 'repay_received').reduce((n, t) => n + t.amount, 0);
   const filtered = !!kind || !!method || !!q || !!day || !allTime;
+  const range = cycle ? `${dayLabel(cycle.start)} – ${dayLabel(cycle.end)}` : '';
+  const count = data?.total ?? items.length;
 
   return (
     <div className="page">
       <div className="card">
         <div className="card-head">
           <div>
-            <h2 className="card-title">{day ? fullDayLabel(day) : allTime ? 'All time' : monthLabel(month)}</h2>
+            <h2 className="card-title">
+              {day ? fullDayLabel(day)
+                : cycle ? (billView ? `${monthLabel(month)} bill` : `${method} · this cycle`)
+                : allTime ? 'All time' : monthLabel(month)}
+            </h2>
             <p className="card-sub">
-              {data?.total ?? items.length} {(data?.total ?? items.length) === 1 ? 'entry' : 'entries'}
-              {filtered ? ' matching' : ''}
-              {data?.hasMore ? ` · showing the latest ${items.length}` : ''}
+              {cycle ? (
+                billView
+                  ? `${range} · statement ${dayLabel(cycle.end)} · ${count} ${count === 1 ? 'entry' : 'entries'}`
+                  : `${range} · resets after the ${dayLabel(cycle.end)} statement`
+              ) : (
+                <>
+                  {count} {count === 1 ? 'entry' : 'entries'}
+                  {filtered ? ' matching' : ''}
+                  {data?.hasMore ? ` · showing the latest ${items.length}` : ''}
+                </>
+              )}
             </p>
           </div>
           <button className="card-action" onClick={openMonthSheet}>
@@ -93,12 +123,21 @@ export default function Transactions() {
         {/* One way back out, whichever way you narrowed it. */}
         {(day || !allTime) && (
           <button className="daybar" onClick={showAllTime}>
-            <span>{day ? `Showing ${fullDayLabel(day)}` : `Showing ${monthLabel(month)}`}</span>
+            <span>
+              {day ? `Showing ${fullDayLabel(day)}`
+                : billView ? `Showing the ${monthLabel(month)} bill cycle`
+                : `Showing ${monthLabel(month)}`}
+            </span>
             <span className="daybar-a">See all time</span>
           </button>
         )}
 
-        <FlowBar inAmount={got} outAmount={spent} />
+        {cycle
+          ? <FlowBar inAmount={got} outAmount={spent} inLabel="Paid" outLabel="Spent" />
+          : <FlowBar inAmount={got} outAmount={spent} />}
+        {cycle && !billView && (
+          <p className="hint">{count} {count === 1 ? 'entry' : 'entries'} on {method} listed below, from all time.</p>
+        )}
       </div>
 
       <div className="searchbar" data-tour="search">
@@ -173,7 +212,7 @@ export default function Transactions() {
               ? `No entry matches “${q}”.`
               : `No ${kind ? `${KINDS[kind].label.toLowerCase()} ` : ''}entries` +
                 `${method ? ` in ${method}` : ''}` +
-                `${day ? ` on ${dayLabel(day)}` : allTime ? ' yet' : ` in ${monthLabel(month)}`}.`}
+                `${day ? ` on ${dayLabel(day)}` : billView ? ` in the ${monthLabel(month)} bill cycle (${range})` : allTime ? ' yet' : ` in ${monthLabel(month)}`}.`}
           </div>
           {filtered ? (
             <button className="btn" style={{ marginTop: 16 }}
@@ -190,7 +229,9 @@ export default function Transactions() {
 
       {items.length > 0 && (
         <p className="list-foot num">
-          {money(got, currency)} in · {money(spent, currency)} out
+          {cycle
+            ? `${money(spent, currency)} spent · ${money(got, currency)} paid this ${billView ? 'bill cycle' : 'cycle'}`
+            : `${money(got, currency)} in · ${money(spent, currency)} out`}
         </p>
       )}
     </div>

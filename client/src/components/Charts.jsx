@@ -13,7 +13,7 @@ function topRounded(x, y, w, h, r) {
 /* ── Flow bar ──────────────────────────────────────────────────────────────
    One line that answers "did more come in than went out?" before any number is
    read. Widths are shares of the larger side, so the two are directly comparable. */
-export function FlowBar({ inAmount, outAmount }) {
+export function FlowBar({ inAmount, outAmount, inLabel = 'In', outLabel = 'Out' }) {
   const { currency } = useStore();
   const max = Math.max(inAmount, outAmount, 1);
   const w = (v) => `${Math.max(v > 0 ? 4 : 0, (v / max) * 100)}%`;
@@ -21,12 +21,12 @@ export function FlowBar({ inAmount, outAmount }) {
   return (
     <div className="flow">
       <div className="flow-line">
-        <span className="flow-k">In</span>
+        <span className="flow-k">{inLabel}</span>
         <span className="flow-track"><i className="flow-fill tone-bg-in" style={{ width: w(inAmount) }} /></span>
         <span className="flow-v num tone-text-in">{money(inAmount, currency)}</span>
       </div>
       <div className="flow-line">
-        <span className="flow-k">Out</span>
+        <span className="flow-k">{outLabel}</span>
         <span className="flow-track"><i className="flow-fill tone-bg-out" style={{ width: w(outAmount) }} /></span>
         <span className="flow-v num tone-text-out">{money(outAmount, currency)}</span>
       </div>
