@@ -54,6 +54,16 @@ export function dayLabel(iso) {
   });
 }
 
+/* A date as a bill prints it — "27 Sept" — never "Yesterday". Relative words
+   read well on a list of entries and badly in a range or on a due date. */
+export function dateShort(iso) {
+  const d = new Date(`${dayOf(iso)}T00:00:00Z`);
+  return d.toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', timeZone: 'UTC',
+    ...(d.getUTCFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}),
+  });
+}
+
 // 'Mon' / 'Tue' … for the second line of a day header.
 export function weekdayLabel(key) {
   return new Date(`${dayOf(key)}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'short', timeZone: 'UTC' });

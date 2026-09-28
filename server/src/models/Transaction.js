@@ -178,9 +178,12 @@ export const methodTotals = (userId, monthStart, monthEnd) =>
 // Where the month's money went, and where it came from.
 export const categoryAndSource = (userId, monthStart, monthEnd) =>
   many(
-    `select 'category' as dim, category as name, sum(amount) as total, count(*)::int as count
-       from transactions where user_id = $1 and kind = 'expense' and date >= $2 and date < $3
+    `select 'category' as dim, category as name,
+            sum(case when kind = 'refund' then -amount else amount end) as total,
+            count(*) filter (where kind = 'expense')::int as count
+       from transactions where user_id = $1 and kind in ('expense', 'refund') and date >= $2 and date < $3
       group by category
+     having sum(case when kind = 'refund' then -amount else amount end) > 0.005
      union all
      select 'source', source, sum(amount), count(*)::int
        from transactions where user_id = $1 and kind = 'income' and date >= $2 and date < $3

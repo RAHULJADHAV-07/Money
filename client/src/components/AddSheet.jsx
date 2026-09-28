@@ -22,6 +22,7 @@ const EVERYDAY = ['expense', 'income', 'transfer'];
 const MORE_GROUPS = [
   { label: 'With people', kinds: ['lent', 'borrowed', 'repay_received', 'repay_paid', 'settle_received', 'settle_paid'] },
   { label: 'Savings', kinds: ['saving_in', 'saving_out'] },
+  { label: 'Money back', kinds: ['refund'] },
 ];
 
 // Asked in the words of whatever you are entering, which is when it means most.
@@ -170,7 +171,7 @@ export default function AddSheet() {
   const shortMessage = () => payingCard
     ? `${effMethod} has ${money(Math.max(0, available), currency)} of credit left on a ${money(payingWallet.limit, currency)} limit. ` +
       `This entry needs ${money(spend, currency)}. Pay some of the card off first, pick another wallet, or if the bank ` +
-      `raised your limit, update it in Settings → Wallets.`
+      `raised your limit, update it in Settings → Credit cards.`
     : `${available <= 0.005 ? `${effMethod} is empty.` : `${effMethod} only has ${money(available, currency)}.`} ` +
       `This entry needs ${money(spend, currency)}. Pick another wallet, or if ${effMethod} already held money ` +
       `before you started logging here, set its opening balance in Settings → Wallets.`;
@@ -404,6 +405,16 @@ export default function AddSheet() {
           <span>
             A cash withdrawal on a credit card. Banks charge interest on these from the same day, with no
             interest-free period, and usually a fee of 2.5% or so on top.
+          </span>
+        </div>
+      )}
+
+      {kind === 'refund' && (
+        <div className="note-box">
+          <span>
+            {payingCard
+              ? `Back onto ${effMethod}: what you owe goes down, and it comes off your ${effCategory} spending. It is not income.`
+              : `Money back on something you bought. It comes off your ${effCategory} spending rather than counting as income.`}
           </span>
         </div>
       )}

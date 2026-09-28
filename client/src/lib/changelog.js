@@ -10,6 +10,19 @@ import { isNewer } from './version.js';
 
 export const CHANGELOG = [
   {
+    version: '2.5.0',
+    title: 'Credit cards, rebuilt so the numbers always add up',
+    changes: [
+      'A credit limit is never money any more. It lives on the card and nowhere else — not in your balance, not as income, not as an opening balance. If a limit had been logged as income into a card, or typed in as what you owed when you started, the app has fixed it for you: the entry is set aside (not deleted) and the card now shows what you really owe.',
+      'Every card shows four separate numbers, each labelled: Spent this cycle, Paid this cycle, Outstanding (what you owe now) and Available credit — plus the day the statement closes and the day payment is due. The home screen has a Credit cards section of its own, away from the money you actually have.',
+      'Adding a card asks only for what matters: a name, the limit, the statement date and when it renews or expires. The due date, minimum due, interest, opening outstanding and notes are all optional, and the card works with none of them. Cards now live under More → Credit cards, where you can also rename one — every entry moves with it — or give it a colour.',
+      'Pay card: choose the amount — the statement balance, everything owed, the minimum, or your own figure — and which wallet it comes from. It lowers what you owe and your bank balance together, and it is never counted as spending, so nothing is counted twice.',
+      'A new entry type, Refund, for money back on a purchase. On a card it lowers what you owe; either way it comes off that category’s spending instead of pretending to be income.',
+      'The ledger speaks card: pick a card under Paid with and it shows that card’s spending and payments for the period you choose — this cycle, last statement, any month’s statement, or all time — with what you owe now shown separately. Everywhere else, Money in and Money out now mean real money: a card purchase is not money out, paying the card bill is.',
+      'Each card’s screen also has a custom period, all-time totals, earlier statements and whether each was paid in full, and marks a card expired once its expiry month has passed — keeping every statement and entry.',
+    ],
+  },
+  {
     version: '2.4.0',
     title: 'Credit cards that work like credit cards',
     changes: [

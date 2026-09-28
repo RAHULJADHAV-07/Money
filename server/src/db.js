@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import { migrateCards } from './lib/migrate-cards.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -76,6 +77,7 @@ export async function connect(url) {
   console.log(`[db] connected to ${rows[0].name}`);
 
   await pool.query(fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8'));
+  await migrateCards(pool);
   return pool;
 }
 

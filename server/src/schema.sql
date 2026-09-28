@@ -182,3 +182,18 @@ alter table routines add column if not exists ends_on   date;
    out already owing on it. Added as an ALTER so an existing database picks it
    up on its next boot. */
 alter table settings add column if not exists credit_cards jsonb not null default '{}'::jsonb;
+
+/* Which one-time credit card repair this account has had (see
+   lib/migrate-cards.js). 0 = none yet. */
+alter table settings add column if not exists credit_version int not null default 0;
+
+/* Entries a migration took out of the ledger because they were never money —
+   a credit limit logged as income into the card. Kept whole, with the reason,
+   so any of them can be put back by hand; nothing is ever simply deleted. */
+create table if not exists archived_entries (
+  id          text primary key,
+  user_id     text not null references users(id) on delete cascade,
+  entry       jsonb not null,
+  reason      text not null default '',
+  archived_at timestamptz not null default now()
+);

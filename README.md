@@ -92,20 +92,33 @@ Because it is one ledger, nothing can drift out of sync the way separate sheets 
 
 ### Credit cards
 
-Any wallet can be marked as a credit card (**Settings → Wallets**), with a limit,
-a statement day, a due day, a yearly interest rate and a minimum-due rule. A card
-runs the other way from a wallet: it sits **below zero by what you owe**.
+*Rebuilt in 2.5.0 — see `server/src/lib/credit.js` for the model and `server/test/credit.test.js` for the scenarios it is held to (`npm test`).*
+
+Cards are added under **More → Credit cards**. Only the **limit**, the **statement
+date** and the **renewal / expiry month** are required; the due date, minimum due,
+interest rate, opening outstanding, colour and notes are optional. A card runs the
+other way from a wallet: it sits **below zero by what you owe**, and that figure is
+never stored — it is the opening outstanding plus every entry on the card. The limit
+is a setting only: it is never income, never an opening balance, never cash.
 
 | You do | Log it as | What happens |
 |---|---|---|
 | Swipe the card | Expense, paid from the card | Counted as spending that day; the card's debt grows. Cash in hand is untouched |
 | Pay the bill | Transfer, Bank → card | Cash goes down, the debt goes down. Not an expense, so nothing is counted twice |
-| Get a refund | Income, received in the card | The debt goes down |
+| Get a refund | Refund, back onto the card | The debt goes down, and the category's spending with it |
 | Withdraw cash | Transfer, card → Cash | Allowed, with a warning: interest starts that day |
 
-- **Balance in hand** leaves the cards out. **Card dues** = what every card owes.
-- **Net worth** = balance + savings + to receive − to pay − card dues.
-- A card cannot be taken past its limit (with no limit set, it is not checked).
+- **Balance in hand** leaves the cards out. **Outstanding** = what every card owes.
+- **Available credit** = limit − outstanding. Never anything to do with Bank or Cash.
+- **Net worth** = balance + savings + to receive − to pay − outstanding.
+- **Money in / Money out** in the ledger is real money: a card purchase is not money
+  out, paying the card bill is.
+- A card cannot be taken past its limit.
+- Renewal is a reminder only; an expiry month marks the card expired and keeps all of
+  its history.
+- Cards set up before 2.5.0 with a limit logged as income, or typed in as the opening
+  outstanding, are repaired once on boot (`server/src/lib/migrate-cards.js`); any
+  entry taken out is kept in `archived_entries`.
 
 Each card's bill is worked out from its own entries in
 [server/src/lib/credit.js](server/src/lib/credit.js): the cycle runs from the

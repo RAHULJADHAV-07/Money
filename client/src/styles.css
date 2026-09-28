@@ -2650,23 +2650,6 @@ button.ccard:active { transform: scale(.98); }
   border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface);
 }
 
-/* Settings: each wallet, with the switch that makes it a card and, once it is
-   one, the terms it runs on in a panel underneath. */
-.wallet-set { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
-.wallet-set .num-row { border-bottom: none; }
-.wallet-set.is-card .num-row-k { font-weight: 650; }
-.cc-check { margin: 0 0 6px; padding: 0 0 4px; background: none; border: none; border-radius: 0; align-items: center; }
-.cc-check input { margin-top: 0; }
-.cc-check .check-body b { font-weight: 580; color: var(--ink-2); }
-.cc-terms {
-  margin: 4px 0 10px; padding: 6px 12px 12px;
-  border-radius: var(--r-sm); background: var(--surface-2); border: 1px solid var(--line);
-}
-.cc-terms .num-row { border-bottom: 1px solid var(--line); }
-.cc-terms .num-row-field { background: var(--surface); }
-.cc-days { margin-top: 12px; }
-.cc-days .field { margin-bottom: 0; }
-.cc-days select.input { font-size: 13px; }
 .suffix-field {
   display: flex; align-items: center; gap: 6px;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
@@ -2676,3 +2659,84 @@ button.ccard:active { transform: scale(.98); }
 .suffix-field .input { border: none; background: none; min-width: 0; }
 .suffix-field .input:focus { box-shadow: none; }
 .suffix-field span { font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+
+/* ── Credit cards, 2.5 ─────────────────────────────────────────────────────
+   Every figure on a card carries its own label — Outstanding, Available
+   credit, Spent this cycle — because the four of them are different numbers
+   and the old "in / out / owed" left the reader to work out which was which. */
+.ccard-period { display: block; font-size: 17px; font-weight: 700; letter-spacing: -.02em; margin-top: 2px; }
+.ccard-stats {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, .16);
+}
+.ccard-stats > span { min-width: 0; }
+.ccard-stats i { display: block; font-style: normal; font-size: 10.5px; font-weight: 600; opacity: .78; }
+.ccard-stats b { display: block; font-size: 14.5px; font-weight: 700; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ccard-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.ccard-actions button {
+  min-height: 38px; border-radius: var(--r-xs);
+  font-size: 12.5px; font-weight: 650; color: #fff; text-align: center;
+  background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .22);
+  transition: background .15s var(--ease);
+}
+.ccard-actions button:hover { background: rgba(255, 255, 255, .22); }
+.ccard-actions button.is-primary { background: #fff; color: color-mix(in oklab, var(--wc) 70%, #000); border-color: #fff; }
+.ccard-actions button:disabled { opacity: .45; }
+.ccard--expired { filter: grayscale(.75); }
+
+.kv-n { display: block; font-size: 10.5px; color: var(--ink-3); margin-top: 2px; }
+.kv-grid--tight { margin-top: 0; margin-bottom: 16px; }
+.cc-section--flush { border-bottom: none; padding-top: 0; }
+.cc-actions { margin: 14px 0 16px; }
+.cc-dates {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;
+}
+.cc-dates > div {
+  padding: 10px 12px; border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--save) var(--tint), var(--surface));
+}
+.cc-dates span { display: block; font-size: 11px; font-weight: 600; color: var(--ink-3); }
+.cc-dates b { display: block; font-size: 15px; font-weight: 700; margin-top: 3px; letter-spacing: -.02em; }
+.cc-dates i { display: block; font-style: normal; font-size: 10.5px; color: var(--ink-3); margin-top: 1px; }
+
+.cc-now {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px;
+  margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line-2);
+  font-size: 12px; color: var(--ink-3);
+}
+.cc-now b { font-size: 12.5px; font-weight: 650; color: var(--ink-2); }
+
+.cc-preview {
+  display: grid; gap: 6px; margin: 2px 0 16px; padding: 11px 13px;
+  border-radius: var(--r-sm); background: var(--surface-2); border: 1px solid var(--line);
+}
+.cc-preview > div { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; }
+.cc-preview span { color: var(--ink-3); }
+.cc-preview b { font-weight: 650; }
+.cc-adv { margin-top: 12px; }
+
+.form-h {
+  font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--ink-3); margin: 20px 0 10px;
+}
+.form-h:first-of-type { margin-top: 4px; }
+.req, .opt { font-size: 10.5px; font-weight: 600; color: var(--ink-3); }
+.req { color: var(--save); }
+.amount-field--sm { padding: 8px 14px; }
+.amount-field--sm .amount-cur { font-size: 18px; }
+.amount-field--sm .amount-input { font-size: 22px; }
+.swatch--auto { background: var(--surface-3); color: var(--ink-2); font-size: 12px; font-weight: 700; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.chips--flush { margin: 0 0 12px; }
+.chip {
+  padding: 7px 12px; border-radius: var(--r-pill);
+  font-size: 12px; font-weight: 620; color: var(--ink-2);
+  background: var(--surface-2); border: 1px solid var(--line);
+  transition: background .15s var(--ease), border-color .15s;
+}
+.chip:hover { border-color: var(--line-2); }
+.chip.is-on {
+  background: color-mix(in oklab, var(--save) var(--tint-strong), var(--surface));
+  border-color: color-mix(in oklab, var(--save) 40%, var(--line)); color: var(--save);
+}

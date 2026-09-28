@@ -86,7 +86,7 @@ export function shortfall(wallet, available, needed, currency, card = null) {
       new Error(
         `${wallet} has ${money(Math.max(0, available))} of credit left on a ${money(card.limit)} limit. ` +
         `This entry needs ${money(needed)}. Pay some of the card off first, pick another wallet, ` +
-        `or if the bank raised your limit, update it in Settings → Wallets.`
+        `or if the bank raised your limit, update it in Settings → Credit cards.`
       ),
       { status: 400, code: 'CREDIT_LIMIT', wallet, available, needed }
     );

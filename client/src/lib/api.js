@@ -165,6 +165,16 @@ export const api = {
   /* Every credit card with its bill worked out as of the device's today --
      statement, minimum, due date, cycle and past statements. */
   cards: (today) => get(`/cards${today ? `?today=${today}` : ''}`),
+  // Purchases, refunds and payments on one card over any stretch of days.
+  cardActivity: (name, from, to) =>
+    get(`/cards/${encodeURIComponent(name)}/activity?${new URLSearchParams(Object.entries({ from, to }).filter(([, v]) => v))}`),
+  /* A card's terms and its opening outstanding save together, through here
+     only. Adding one whose name is an existing wallet turns that wallet into
+     the card; renaming carries every entry across. */
+  createCard: (body) => post('/cards', body),
+  updateCard: (name, body) => put(`/cards/${encodeURIComponent(name)}`, body),
+  // Stops being a card; the wallet and every entry on it stay.
+  removeCard: (name) => del(`/cards/${encodeURIComponent(name)}`),
   goals: () => get('/goals'),
   createGoal: (body) => post('/goals', body),
   updateGoal: (id, body) => put(`/goals/${id}`, body),

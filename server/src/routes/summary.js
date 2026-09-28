@@ -99,7 +99,9 @@ router.get('/', wrap(async (req, res) => {
     if (!card) continue;
     w.credit = true;
     w.limit = card.limit;
-    w.owed = Math.max(0, -w.balance);
+    w.outstanding = Math.max(0, -w.balance);
+    w.owed = w.outstanding;
+    w.available = card.limit > 0 ? card.limit + w.balance : null;
   }
 
   const wallets = Object.values(wallet).sort((a, b) => b.balance - a.balance || a.name.localeCompare(b.name));
@@ -136,12 +138,13 @@ router.get('/', wrap(async (req, res) => {
   const trend = trendKeys.map((m) => ({
     month: m,
     income: (trendMap[m]?.income || 0) + (trendMap[m]?.repay_received || 0),
-    expense: trendMap[m]?.expense || 0,
+    // Spending is net of refunds: money back on a purchase undoes part of it.
+    expense: (trendMap[m]?.expense || 0) - (trendMap[m]?.refund || 0),
     saved: (trendMap[m]?.saving_in || 0) - (trendMap[m]?.saving_out || 0),
   }));
 
   const monthIncome = get(month, 'income');
-  const monthExpense = get(month, 'expense');
+  const monthExpense = get(month, 'expense') - get(month, 'refund');
 
   res.json({
     month: key,
@@ -157,7 +160,7 @@ router.get('/', wrap(async (req, res) => {
     },
     today: {
       date: today,
-      spent: get(day, 'expense'),
+      spent: Math.max(0, get(day, 'expense') - get(day, 'refund')),
       received: get(day, 'income') + get(day, 'repay_received'),
       count: scoped(kindRows, 'day').reduce((n, r) => n + r.count, 0),
     },
@@ -218,6 +221,7 @@ router.get('/wallets', wrap(async (req, res) => {
       const left = availableIn(name, balances, cards);
       return {
         name, balance, credit: true, limit: cards[name].limit,
+        outstanding: Math.max(0, -balance),
         owed: Math.max(0, -balance),
         available: Number.isFinite(left) ? left : null,
       };
@@ -237,9 +241,11 @@ router.get('/calendar', wrap(async (req, res) => {
     const dir = dirOf(r.kind);
     d.count += r.count;
     if (r.kind === 'expense') d.spent += r.total;
+    else if (r.kind === 'refund') d.spent -= r.total;      // money back undoes spending, it is not income
     else if (dir > 0 && r.kind !== 'transfer') d.received += r.total;
   }
 
+  for (const d of Object.values(days)) d.spent = Math.max(0, d.spent);
   const list = Object.values(days).sort((a, b) => a.day.localeCompare(b.day));
   const busiest = list.reduce((best, d) => (!best || d.spent > best.spent ? d : best), null);
 
@@ -269,9 +275,11 @@ router.get('/year', wrap(async (req, res) => {
     if (!m) continue;
     m.count += r.count;
     if (r.kind === 'expense') m.spent += r.total;
+    else if (r.kind === 'refund') m.spent -= r.total;
     else if (dirOf(r.kind) > 0 && r.kind !== 'transfer') m.received += r.total;
   }
 
+  for (const m of Object.values(map)) m.spent = Math.max(0, m.spent);
   const months = Object.values(map);
   res.json({
     year,
