@@ -1,185 +1,179 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sheet from './Sheet.jsx';
+import { api } from '../lib/api.js';
 import { useStore } from '../lib/store.jsx';
-import { money as fmt, moneyRound, dayLabel, pct } from '../lib/format.js';
+import { money as fmt, moneyRound, dateShort, pct } from '../lib/format.js';
 import { walletHue } from '../lib/palette.js';
-import { billLine, HISTORY_LABEL, utilTone, ordinal } from '../lib/credit.js';
+import { billLine, HISTORY_LABEL, utilTone, ordinal, renewalLine } from '../lib/credit.js';
 import { IconCard, IconChevronRight, IconInfo } from './Icons.jsx';
 
-/* The bill's month, as a bank heads it: "Oct 2026 statement". */
-const billMonth = (key) =>
-  new Date(`${key}T00:00:00Z`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+export const cardColor = (card, order = []) => card.color || walletHue(card.name, order);
 
-/* How much of the limit is used, drawn as a bar. With no limit set there is
-   nothing to fill, so the bar is not drawn at all rather than drawn empty. */
-function UsageBar({ card, onDark = false }) {
-  if (card.utilization === null) return null;
+/* How much of the limit is in use. With no limit there is nothing to fill. */
+export function UsageBar({ card, onDark = false }) {
+  if (card.utilization === null || card.utilization === undefined) return null;
   const u = Math.min(1, card.utilization);
   return (
-    <span className={`cc-bar${onDark ? ' cc-bar--dark' : ''}`} aria-hidden="true">
+    <span className={`cc-bar${onDark ? ' cc-bar--dark' : ''}`} role="img"
+          aria-label={`${Math.round(u * 100)}% of the credit limit used`}>
       <span className={`cc-bar-fill tone-bg-${utilTone(card.utilization)}`} style={{ width: `${Math.max(u * 100, u > 0 ? 3 : 0)}%` }} />
     </span>
   );
 }
 
-/*
- * The card as it sits on the home screen: what you owe on it, how much of the
- * limit that is, and the one thing about its bill worth knowing today.
- */
-export function CardFace({ card, currency, order, onOpen }) {
-  const money = (n) => fmt(n, currency);
-  const line = billLine(card.statement, money);
+const Metric = ({ label, value, tone = '', note }) => (
+  <div className="kv">
+    <span className="kv-k">{label}</span>
+    <span className={`kv-v num${tone ? ` tone-text-${tone}` : ''}`}>{value}</span>
+    {note && <span className="kv-n">{note}</span>}
+  </div>
+);
+
+/* A period of card activity: spending (net of refunds) and payments, never
+   the outstanding — which belongs to no period. */
+function ActivityGrid({ a, money }) {
   return (
-    <button className="ccard" style={{ '--wc': walletHue(card.name, order) }} onClick={onOpen}>
-      <span className="ccard-top">
-        <span className="wname">{card.name}</span>
-        <span className="ccard-chip"><IconCard />Credit</span>
-      </span>
-      <span className="ccard-k">{card.credit > 0 ? 'In credit' : 'Owed'}</span>
-      <span className="wbal num">{money(card.credit > 0 ? card.credit : card.owed)}</span>
-      {card.limit > 0 && (
-        <>
-          <UsageBar card={card} onDark />
-          <span className="wflow num">
-            {moneyRound(card.available, currency)} left of {moneyRound(card.limit, currency)}
-          </span>
-        </>
-      )}
-      {line.text && <span className={`ccard-bill ccard-bill--${line.tone}`}>{line.text}</span>}
-    </button>
+    <div className="kv-grid">
+      <Metric label="Card spending" value={money(a.spent)} />
+      <Metric label="Paid to card" value={money(a.paid)} tone="in" />
+      <Metric label="Purchases" value={money(a.purchases)} />
+      <Metric label="Refunds" value={money(a.refunds)} />
+    </div>
+  );
+}
+
+function CustomPeriod({ card, money }) {
+  const [from, setFrom] = useState(card.cycle.start);
+  const [to, setTo] = useState(card.cycle.end);
+  const [a, setA] = useState(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let alive = true;
+    setError('');
+    api.cardActivity(card.name, from, to)
+      .then((r) => alive && setA(r))
+      .catch((e) => alive && (setA(null), setError(e.message)));
+    return () => { alive = false; };
+  }, [card.name, from, to]);
+  return (
+    <>
+      <div className="row-2">
+        <div className="field">
+          <label className="field-label" htmlFor="cp-from">From</label>
+          <input id="cp-from" className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </div>
+        <div className="field">
+          <label className="field-label" htmlFor="cp-to">To</label>
+          <input id="cp-to" className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+      </div>
+      {error && <p className="field-warn">{error}</p>}
+      {a && <ActivityGrid a={a} money={money} />}
+      {a && <p className="hint">{a.count} {a.count === 1 ? 'entry' : 'entries'} on {card.name} from {dateShort(from)} to {dateShort(to)}, both days included.</p>}
+    </>
   );
 }
 
 /*
- * One card's bill, the way the bank would print it — and a way to pay it.
- *
- * Paying opens an ordinary transfer from a wallet of yours into the card. It
- * is a transfer and not an expense on purpose: the spending was counted the
- * day you swiped, and counting the bill again would put every purchase in
- * twice.
+ * One credit card, the way a normal person asks about it: what did I spend
+ * this cycle, what do I owe, how much can I still spend, when does the
+ * statement close and when must I pay. The limit, the outstanding and the
+ * spending are three different numbers and are never shown as one.
  */
-export default function CardSheet({ card, wallets = [], onClose }) {
-  const { currency, openAdd, settings } = useStore();
+export default function CardSheet({ card, onClose, onPay, onEdit }) {
+  const { currency, settings } = useStore();
   const navigate = useNavigate();
   const money = (n) => fmt(n, currency);
+  const [tab, setTab] = useState('statement');
   const st = card.statement;
   const line = billLine(st, money);
+  const cyc = card.cycle;
 
-  // The wallet a bill is most likely paid from: whichever of yours holds the most.
-  const payer = wallets.filter((w) => !w.credit).sort((a, b) => b.balance - a.balance)[0]?.name;
-
-  const pay = (amount, note) => {
-    onClose();
-    openAdd({ kind: 'transfer', method: payer, toMethod: card.name, amount: amount > 0 ? amount : '', note });
-  };
   const goLedger = () => { onClose(); navigate(`/ledger?wallet=${encodeURIComponent(card.name)}`); };
-  const goSettings = () => { onClose(); navigate('/settings'); };
-
-  const carrying = st.remaining > 0.005;
-  const hasMin = st.remainingMin > 0.005 && st.remainingMin < st.remaining - 0.005;
 
   return (
-    <Sheet title={card.name} subtitle="Credit card" onClose={onClose}>
-      <div className="ccard ccard--big" style={{ '--wc': walletHue(card.name, settings?.methods || []) }}>
+    <Sheet title={card.name} subtitle={card.expired ? 'Credit card · expired' : 'Credit card'} onClose={onClose}>
+      <div className="ccard ccard--big" style={{ '--wc': cardColor(card, settings?.methods || []) }}>
         <span className="ccard-top">
           <span className="wname">{card.name}</span>
-          <span className="ccard-chip"><IconCard />Credit</span>
+          <span className="ccard-chip"><IconCard />{card.expired ? 'Expired' : 'Credit'}</span>
         </span>
-        <span className="ccard-k">{card.credit > 0 ? 'In credit — the bank owes you' : 'Total owed'}</span>
-        <span className="wbal num">{money(card.credit > 0 ? card.credit : card.owed)}</span>
-        {card.limit > 0 ? (
+        <span className="ccard-k">Current cycle</span>
+        <span className="ccard-period">{dateShort(cyc.start)} – {dateShort(cyc.end)}</span>
+        {card.limit > 0 && (
           <>
             <UsageBar card={card} onDark />
             <span className="ccard-foot num">
-              <span>{money(card.available)} available</span>
-              <span>{pct(card.utilization)} of {moneyRound(card.limit, currency)}</span>
+              <span>{money(card.outstanding)} used</span>
+              <span>of {moneyRound(card.limit, currency)} limit</span>
             </span>
           </>
-        ) : (
-          <span className="wflow">No limit set — add it in Settings to see what is left.</span>
         )}
       </div>
 
-      {/* ── The bill ─────────────────────────────────────────────────────── */}
-      <div className="cc-section">
-        <div className="cc-head">
-          <h3 className="cc-title">{billMonth(st.date)} statement</h3>
-          {line.badge && <span className={`badge badge--${line.tone}`}>{line.badge}</span>}
-        </div>
-        <p className={`cc-line tone-text-${line.tone === 'warn' ? 'warn' : line.tone === 'flat' ? 'flat' : line.tone}`}>{line.text}</p>
+      <div className="kv-grid">
+        <Metric label="Spent this cycle" value={money(cyc.spent)} note={cyc.refunds > 0 ? `after ${money(cyc.refunds)} refunded` : null} />
+        <Metric label="Paid this cycle" value={money(cyc.paid)} tone="in" />
+        <Metric label="Outstanding" value={money(card.outstanding)} tone={card.outstanding > 0 ? 'out' : ''}
+                note={card.inCredit > 0 ? `${money(card.inCredit)} in credit` : 'what you owe now'} />
+        <Metric label="Available credit" value={card.available === null ? '—' : money(card.available)}
+                note={card.limit > 0 ? `of ${moneyRound(card.limit, currency)}` : 'no limit set'} />
+      </div>
 
-        <div className="kv-grid">
-          <div className="kv"><span className="kv-k">Bill amount</span><span className="kv-v num">{money(st.billed)}</span></div>
-          <div className="kv"><span className="kv-k">Minimum due</span><span className="kv-v num">{money(st.minDue)}</span></div>
-          <div className="kv"><span className="kv-k">Statement date</span><span className="kv-v">{dayLabel(st.date)}</span></div>
-          <div className="kv">
-            <span className="kv-k">Due date</span>
-            <span className={`kv-v${st.status === 'overdue' ? ' tone-text-out' : ''}`}>{dayLabel(st.dueDate)}</span>
+      <div className="cc-dates">
+        <div><span>Statement closes</span><b>{dateShort(cyc.end)}</b><i>{cyc.daysToClose === 0 ? 'today' : `in ${cyc.daysToClose} days`}</i></div>
+        <div><span>Payment due</span><b>{cyc.dueDate ? dateShort(cyc.dueDate) : 'Not set'}</b><i>for this cycle</i></div>
+      </div>
+
+      <div className="btn-row cc-actions">
+        <button className="btn btn--primary btn--block" onClick={onPay} disabled={card.outstanding <= 0.005}>Pay card</button>
+        <button className="btn btn--block" onClick={onEdit}>Edit card</button>
+      </div>
+
+      <div className="seg" role="tablist" aria-label="Period">
+        {[['statement', 'Last statement'], ['custom', 'Custom period'], ['all', 'All time']].map(([k, label]) => (
+          <button key={k} type="button" role="tab" className="seg-btn" aria-selected={tab === k} onClick={() => setTab(k)}>{label}</button>
+        ))}
+      </div>
+
+      {tab === 'statement' && (
+        <div className="cc-section cc-section--flush">
+          <div className="cc-head">
+            <h3 className="cc-title">{dateShort(st.cycleStart)} – {dateShort(st.date)}</h3>
+            {line.badge && <span className={`badge badge--${line.tone}`}>{line.badge}</span>}
           </div>
-          <div className="kv"><span className="kv-k">Paid since</span><span className="kv-v num tone-text-in">{money(st.paid)}</span></div>
-          <div className="kv"><span className="kv-k">Left to pay</span><span className="kv-v num">{money(st.remaining)}</span></div>
-        </div>
-
-        {carrying ? (
-          <div className="cc-pay">
-            <button className="btn btn--primary btn--block" onClick={() => pay(st.remaining, `${card.name} bill`)}>
-              Pay full bill · {money(st.remaining)}
-            </button>
-            <div className="btn-row">
-              {hasMin && (
-                <button className="btn btn--block" onClick={() => pay(st.remainingMin, `${card.name} minimum due`)}>
-                  Minimum · {money(st.remainingMin)}
-                </button>
-              )}
-              <button className="btn btn--block" onClick={() => pay(0, `${card.name} payment`)}>Other amount</button>
+          <p className={`cc-line tone-text-${line.tone}`}>{line.text}</p>
+          <div className="kv-grid">
+            <Metric label="Statement total" value={money(st.billed)} note="owed when it closed" />
+            <Metric label="Spent in that cycle" value={money(st.spent)} />
+            <Metric label="Paid since" value={money(st.paid)} tone="in" note="payments and refunds" />
+            <Metric label="Remaining" value={money(st.remaining)} tone={st.remaining > 0 ? 'out' : ''} />
+            <Metric label="Payment due" value={st.dueDate ? dateShort(st.dueDate) : 'Not set'} />
+            {st.minDue !== null && <Metric label="Minimum due" value={money(st.minDue)} />}
+          </div>
+          {st.remaining > 0.005 && card.interestIfCarried > 0 && (
+            <div className="note-box note-box--warn">
+              <IconInfo />
+              <span>
+                Pay the full {money(st.remaining)}{st.dueDate ? ` by ${dateShort(st.dueDate)}` : ''} and there is no interest.
+                Leave part of it and about {money(card.interestIfCarried)} a month is added at {card.apr}% a year.
+              </span>
             </div>
-          </div>
-        ) : card.owed > 0.005 ? (
-          <div className="cc-pay">
-            <button className="btn btn--block" onClick={() => pay(card.owed, `${card.name} payment`)}>
-              Pay off everything now · {money(card.owed)}
-            </button>
-          </div>
-        ) : null}
-
-        {carrying && card.apr > 0 && (
-          <div className="note-box note-box--warn">
-            <IconInfo />
-            <span>
-              {st.status === 'carried' || st.status === 'overdue'
-                ? `Interest is being charged on the ${money(st.remaining)} left — about ${money(card.interestIfCarried)} a month at ${card.apr}% a year — and new purchases get no interest-free days until it is cleared.`
-                : `Pay the full ${money(st.remaining)} by ${dayLabel(st.dueDate)} and there is no interest at all. Pay only part and about ${money(card.interestIfCarried)} a month is added at ${card.apr}% a year, and new purchases stop being interest-free.`}
-              {st.status === 'overdue' && ' A late fee is usually added too, and the missed payment reaches your credit score.'}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* ── The cycle running now ────────────────────────────────────────── */}
-      <div className="cc-section">
-        <div className="cc-head">
-          <h3 className="cc-title">This cycle</h3>
-          <span className="cc-sub">{dayLabel(card.cycle.start)} – {dayLabel(card.cycle.end)}</span>
+          )}
         </div>
-        <div className="strip"><span className="k">Spent so far, not yet billed</span><span className="v num">{money(card.cycle.unbilled)}</span></div>
-        <div className="strip">
-          <span className="k">Next statement</span>
-          <span className="v">{dayLabel(card.cycle.end)} · {card.cycle.daysToStatement === 0 ? 'today' : `in ${card.cycle.daysToStatement} days`}</span>
-        </div>
-        <div className="strip"><span className="k">Its bill is due</span><span className="v">{dayLabel(card.nextDue)}</span></div>
-        <div className="cc-tip">
-          <span className="card-ico tone-save"><IconCard /></span>
-          <span>
-            <b>Buy today and you have {card.freeDays} days before you pay.</b>
-            <span>
-              The longest stretch is buying on the {ordinal(Number(card.bestDay.slice(8)))}, the day after the statement —
-              {` ${card.maxFreeDays} days`} interest-free. Next one: {dayLabel(card.bestDay)}.
-            </span>
-          </span>
-        </div>
-      </div>
+      )}
+      {tab === 'custom' && <CustomPeriod card={card} money={money} />}
+      {tab === 'all' && (
+        <>
+          <ActivityGrid a={card.allTime} money={money} />
+          <p className="hint">
+            Everything ever spent on {card.name}. What you owe now is {money(card.outstanding)} — worked out separately,
+            from every purchase, refund and payment{card.inCredit > 0 ? '' : ' and the opening outstanding'}.
+          </p>
+        </>
+      )}
 
-      {/* ── Earlier statements ───────────────────────────────────────────── */}
       {card.history.length > 0 && (
         <div className="cc-section">
           <div className="cc-head"><h3 className="cc-title">Earlier statements</h3></div>
@@ -188,8 +182,8 @@ export default function CardSheet({ card, wallets = [], onClose }) {
             return (
               <div key={h.date} className="cc-hist">
                 <span className="cc-hist-body">
-                  <b>{billMonth(h.date)}</b>
-                  <span>spent {money(h.spent)} · paid {money(h.paidByDue)} by {dayLabel(h.dueDate)}</span>
+                  <b>{dateShort(h.cycleStart)} – {dateShort(h.date)}</b>
+                  <span>spent {money(h.spent)} · paid {money(h.paidInTime)}{h.dueDate ? ` by ${dateShort(h.dueDate)}` : ''}</span>
                 </span>
                 <span className="cc-hist-amt num">{money(h.billed)}</span>
                 <span className={`badge badge--${tone}`}>{label}</span>
@@ -199,19 +193,30 @@ export default function CardSheet({ card, wallets = [], onClose }) {
         </div>
       )}
 
+      <div className="cc-section">
+        <div className="cc-head"><h3 className="cc-title">Card details</h3></div>
+        <div className="strip"><span className="k">Credit limit</span><span className="v num">{card.limit > 0 ? money(card.limit) : 'Not set'}</span></div>
+        <div className="strip"><span className="k">Statement date</span><span className="v">{ordinal(card.statementDay)} of each month</span></div>
+        <div className="strip"><span className="k">Payment due</span><span className="v">{card.dueDay ? `${ordinal(card.dueDay)} of the month after` : 'Not set'}</span></div>
+        <div className="strip"><span className="k">Renewal</span><span className={`v${card.expired ? ' tone-text-out' : ''}`}>{renewalLine(card.renewal)}</span></div>
+        {card.minPct !== null && <div className="strip"><span className="k">Minimum due</span><span className="v">{card.minPct}% of the bill</span></div>}
+        {card.apr !== null && <div className="strip"><span className="k">Interest</span><span className="v">{card.apr}% a year</span></div>}
+        {card.utilization !== null && <div className="strip"><span className="k">Limit in use</span><span className="v">{pct(card.utilization)}</span></div>}
+        {card.notes && <p className="hint">{card.notes}</p>}
+        {card.freeDays !== null && card.freeDays >= 0 && (
+          <div className="cc-tip">
+            <span className="card-ico tone-save"><IconCard /></span>
+            <span>
+              <b>Buy today and you have {card.freeDays} days before you pay.</b>
+              <span>Buying on {dateShort(card.bestDay)}, the day after the statement closes, gives the longest — {card.maxFreeDays} days.</span>
+            </span>
+          </div>
+        )}
+      </div>
+
       <div className="cc-links">
         <button className="card--link cc-link" onClick={goLedger}>
-          <span className="cardlink-body"><b>Every entry on {card.name}</b><span>Swipes, refunds and payments, in the ledger.</span></span>
-          <IconChevronRight />
-        </button>
-        <button className="card--link cc-link" onClick={goSettings}>
-          <span className="cardlink-body">
-            <b>Card terms</b>
-            <span>
-              {card.limit > 0 ? `${moneyRound(card.limit, currency)} limit · ` : ''}
-              bill on the {ordinal(card.statementDay)}, due the {ordinal(card.dueDay)} · {card.apr}% a year
-            </span>
-          </span>
+          <span className="cardlink-body"><b>Every entry on {card.name}</b><span>Purchases, refunds and payments, in the ledger.</span></span>
           <IconChevronRight />
         </button>
       </div>

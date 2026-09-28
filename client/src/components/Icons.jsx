@@ -130,6 +130,7 @@ const KIND_PATHS = {
   settle_paid:     <path d="m5 13 4.5 4.5L19 7" />,
   transfer:       <><path d="M4 8h13l-3.5-3.5" /><path d="M20 16H7l3.5 3.5" /></>,
   pass_through:   <><path d="M3 12h18" /><path d="M15 7.5 19.5 12 15 16.5" /><path d="M9 9v6" /></>,
+  refund:         <><path d="M9 14 4.5 9.5 9 5" /><path d="M4.5 9.5h9.5a5.5 5.5 0 0 1 0 11H10" /></>,
 };
 
 export function KindIcon({ kind }) {

@@ -10,6 +10,11 @@ export const KINDS = {
   saving_in:      { label: 'To savings',     dir: -1, needs: 'goal' },
   saving_out:     { label: 'From savings',   dir: +1, needs: 'goal' },
 
+  // Money back on something you bought. It comes into the wallet (or off the
+  // card) like income, but it is not income: it undoes part of an expense, so
+  // every spending total nets it off the category it belongs to.
+  refund:         { label: 'Refund',         dir: +1, needs: 'category' },
+
   // Money you only carried: collected from someone and handed straight on. It
   // comes in and goes out in the same breath, so the net effect on your wallet
   // is nil -- and it is neither an expense, an income, nor a debt. It exists so

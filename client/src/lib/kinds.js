@@ -18,6 +18,11 @@ export const KINDS = {
   saving_in:      { label: 'To savings',    short: 'Saved',     cta: 'Add to savings',   dir: -1, needs: 'goal',     icon: '⌂', tone: 'save', pick: 'Into savings' },
   saving_out:     { label: 'From savings',  short: 'Withdrew',  cta: 'Withdraw',         dir: +1, needs: 'goal',     icon: '⌂', tone: 'in',  pick: 'Out of savings' },
 
+  // Money back on a purchase — undoes part of an expense rather than being
+  // income, so it nets off that category's spending. Onto a card, it lowers
+  // what is owed.
+  refund:         { label: 'Refund',        short: 'Refund',    cta: 'Add refund',        dir: +1, needs: 'category', icon: '↩', tone: 'in',  pick: 'Refund' },
+
   // Money you only carried: in one hand, straight out the other. Net zero, and
   // neither an expense nor an income nor a debt -- it is here so that money
   // passing through your hands shows up instead of vanishing.
@@ -38,7 +43,7 @@ export const KINDS = {
 export const ADD_ORDER = [
   'expense', 'income', 'transfer', 'lent', 'borrowed',
   'repay_received', 'repay_paid', 'settle_received', 'settle_paid',
-  'saving_in', 'saving_out',
+  'saving_in', 'saving_out', 'refund',
 ];
 
 // What a split's parts can be. A transfer moves money between your own wallets,

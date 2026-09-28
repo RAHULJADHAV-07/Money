@@ -3,43 +3,72 @@ import { dirOf } from './kinds.js';
 /*
  * Credit cards.
  *
- * A credit card is a wallet that runs the other way: it starts at zero and goes
- * *below* it as you spend, because what it holds is the bank's money, not
- * yours. Nothing about the ledger changes for that — a swipe is still an
- * expense, paying the bill is still a transfer from Bank into the card — so
- * every total the app already has keeps working. What is new is everything a
- * bank prints on top of that balance, and it is all worked out here from the
- * card's own entries and four numbers you give it:
+ * Five things are kept apart here, because every bug this file has ever had
+ * came from letting two of them share one number:
  *
- *   limit          how far below zero it may go (0 = no limit set)
- *   statementDay   the day of the month the bill is made up
- *   dueDay         the day of the month that bill must be paid by
- *   apr, minPct    the yearly interest, and what share of the bill is the minimum
+ *   REAL MONEY       what Bank, Cash, UPI hold. Never touched by a card.
+ *   CREDIT FACILITY  the limit, and the credit still available under it.
+ *   LIABILITY        what is outstanding on the card right now.
+ *   ACTIVITY         purchases, refunds and payments — the ledger rows.
+ *   STATEMENT        one closed cycle: what it billed, what has been paid.
  *
- * The month runs:  cycle (spend) → statement date → grace period → due date.
- * Pay the whole statement by the due date and no interest is ever charged.
+ * A card is a wallet whose balance runs *below* zero by what is owed. That
+ * balance is never stored anywhere: it is the opening outstanding plus every
+ * ledger row that touched the card, so it cannot drift from the entries. The
+ * limit is a setting and nothing else — it is never income, never an opening
+ * balance, never cash.
+ *
+ *   A purchase   expense, paid with the card    → outstanding up, spending up
+ *   A refund     refund, into the card          → outstanding down, spending down
+ *   A payment    transfer, Bank → card          → outstanding down, Bank down,
+ *                                                 and not spending at all
+ *
+ * The month runs: cycle (spend) → statement date → grace period → due date.
+ * A statement dated the 26th closes the cycle 27 Aug → 26 Sep; spending on the
+ * 27th already belongs to the next one.
  */
-
-export const CARD_DEFAULTS = { limit: 0, statementDay: 1, dueDay: 20, apr: 42, minPct: 5, minFloor: 200 };
 
 const NEAR_ZERO = 0.005;
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
-const clamp = (n, lo, hi, d) => {
-  const v = Number(n);
-  return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d;
-};
+const num = (v) => (v === '' || v === null || v === undefined ? NaN : Number(v));
+const within = (v, lo, hi) => Number.isFinite(v) && v >= lo && v <= hi;
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+const MIN_FLOOR = 200;   // the smallest minimum due banks in India ask for
 
-/** One card's settings, made safe: whatever arrives, the numbers come out usable. */
+/*
+ * One card's terms, made safe. Only the limit and the statement day are needed
+ * for any of the maths; everything else is optional and comes back as null
+ * when it was left empty, so "not set" is never mistaken for "zero".
+ */
 export function cleanCard(raw = {}) {
-  const d = CARD_DEFAULTS;
+  const limit = num(raw.limit);
+  const statementDay = Math.round(num(raw.statementDay));
+  const dueDay = Math.round(num(raw.dueDay));
+  const apr = num(raw.apr);
+  const minPct = num(raw.minPct);
+  const renewal = raw.renewal && typeof raw.renewal === 'object' && MONTH.test(String(raw.renewal.month || ''))
+    ? { kind: raw.renewal.kind === 'expiry' ? 'expiry' : 'annual', month: raw.renewal.month }
+    : null;
   return {
-    limit: r2(clamp(raw.limit, 0, 1e10, d.limit)),
-    statementDay: Math.round(clamp(raw.statementDay, 1, 31, d.statementDay)),
-    dueDay: Math.round(clamp(raw.dueDay, 1, 31, d.dueDay)),
-    apr: r2(clamp(raw.apr, 0, 100, d.apr)),
-    minPct: r2(clamp(raw.minPct, 0, 100, d.minPct)),
-    minFloor: r2(clamp(raw.minFloor, 0, 1e9, d.minFloor)),
+    limit: within(limit, 0, 1e10) ? r2(limit) : 0,
+    statementDay: within(statementDay, 1, 31) ? statementDay : 1,
+    dueDay: within(dueDay, 1, 31) ? dueDay : null,
+    apr: within(apr, 0, 100) ? r2(apr) : null,
+    minPct: within(minPct, 0, 100) ? r2(minPct) : null,
+    renewal,
+    color: typeof raw.color === 'string' && raw.color.length <= 80 ? raw.color : '',
+    notes: typeof raw.notes === 'string' ? raw.notes.trim().slice(0, 500) : '',
   };
+}
+
+/** What is wrong with a card someone is saving, or null. The three required fields. */
+export function cardProblem(raw = {}) {
+  if (!(num(raw.limit) > 0)) return 'Enter the credit limit — it is printed on your card statement';
+  if (!within(Math.round(num(raw.statementDay)), 1, 31)) return 'Choose the day your statement is made up';
+  if (!raw.renewal || !MONTH.test(String(raw.renewal.month || ''))) return 'Choose the month the card renews or expires';
+  const opening = num(raw.openingOutstanding);
+  if (Number.isFinite(opening) && opening < 0) return 'Opening outstanding cannot be negative';
+  return null;
 }
 
 /** The credit cards among the wallets, keyed by wallet name. */
@@ -54,8 +83,8 @@ export function cardsOf(settings) {
 
 /*
  * What a wallet can still pay out. For an ordinary wallet that is what it
- * holds. For a card it is the credit left — the limit less what is owed — and
- * with no limit set, there is nothing to measure against, so it is unbounded.
+ * holds. For a card it is the credit left — limit − outstanding, or limit plus
+ * whatever was overpaid — and never anything to do with any other wallet.
  */
 export function availableIn(name, balances, cards) {
   const balance = balances[name] || 0;
@@ -65,122 +94,178 @@ export function availableIn(name, balances, cards) {
   return card.limit + balance;
 }
 
-/* What one entry did to this card. The same rule as a statement's (see
-   effectOn in statement.js), kept here so the bill maths needs no database. */
-function effectOn(t, card) {
-  if (t.kind !== 'transfer') return t.method === card ? dirOf(t.kind) * t.amount : 0;
-  if (t.method === card) return -t.amount;
-  if (t.to_method === card) return t.amount;
-  return 0;
+/*
+ * What one ledger row did to this card, and what kind of thing it was:
+ *   charge   a purchase (or a cash withdrawal) — outstanding goes up
+ *   refund   money back on a purchase         — outstanding goes down
+ *   payment  money paid in to the card        — outstanding goes down
+ */
+export function cardMove(t, card) {
+  const date = String(t.date).slice(0, 10);
+  if (t.kind === 'transfer') {
+    if (t.method === card) return { date, effect: -t.amount, type: 'charge' };
+    if (t.to_method === card) return { date, effect: t.amount, type: 'payment' };
+    return null;
+  }
+  if (t.method !== card) return null;
+  if (t.kind === 'refund') return { date, effect: t.amount, type: 'refund' };
+  const d = dirOf(t.kind);
+  if (d < 0) return { date, effect: -t.amount, type: 'charge' };
+  if (d > 0) return { date, effect: t.amount, type: 'payment' };
+  return null;
+}
+
+/** What happened on the card between two days, both included. */
+export function activity(moves, from, to) {
+  const a = { purchases: 0, refunds: 0, paid: 0, count: 0 };
+  for (const m of moves) {
+    if ((from && m.date < from) || (to && m.date > to)) continue;
+    a.count++;
+    if (m.type === 'charge') a.purchases += -m.effect;
+    else if (m.type === 'refund') a.refunds += m.effect;
+    else a.paid += m.effect;
+  }
+  return {
+    from: from || null, to: to || null,
+    purchases: r2(a.purchases), refunds: r2(a.refunds),
+    spent: r2(a.purchases - a.refunds),     // what the card was used for, net of refunds
+    paid: r2(a.paid),
+    count: a.count,
+  };
 }
 
 /* ── Calendar arithmetic, on 'YYYY-MM-DD' keys ─────────────────────────────── */
 
-const parse = (key) => { const [y, m, d] = key.split('-').map(Number); return { y, m: m - 1, d }; };
+const parse = (k) => { const [y, m, d] = k.split('-').map(Number); return { y, m: m - 1, d }; };
 const key = (y, m, d) => new Date(Date.UTC(y, m, d)).toISOString().slice(0, 10);
 const lastDay = (y, m) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
 // Day 31 in a 30-day month is the 30th, the way every bank reads it.
 const onDay = (y, m, day) => key(y, m, Math.min(day, lastDay(y, m)));
 export const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
-const addDays = (k, n) => { const t = new Date(`${k}T00:00:00Z`); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+export const addDays = (k, n) => { const t = new Date(`${k}T00:00:00Z`); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
 
-/** The statement date in the month `k` falls in. */
-const statementIn = (k, day) => { const { y, m } = parse(k); return onDay(y, m, day); };
-
-/** The last statement strictly before `today` — the bill currently being paid. */
+/** The last statement strictly before `today`. On the statement day itself the
+    cycle is still open — the statement is made up at the end of that day. */
 export function lastStatement(today, day) {
-  const here = statementIn(today, day);
-  if (here < today) return here;
   const { y, m } = parse(today);
-  return onDay(y, m - 1, day);
+  const here = onDay(y, m, day);
+  return here < today ? here : onDay(y, m - 1, day);
 }
 
 export function nextStatement(after, day) {
-  const here = statementIn(after, day);
-  if (here > after) return here;
   const { y, m } = parse(after);
-  return onDay(y, m + 1, day);
+  const here = onDay(y, m, day);
+  return here > after ? here : onDay(y, m + 1, day);
 }
 
 const prevStatement = (stmt, day) => { const { y, m } = parse(stmt); return onDay(y, m - 1, day); };
 
-/** The first `dueDay` after the statement date — usually 15–25 days later. */
+/** The cycle whose statement is made up in `month` ('YYYY-MM'): that month's bill. */
+export function cycleOfMonth(month, day) {
+  const [y, m] = month.split('-').map(Number);
+  const end = onDay(y, m - 1, day);
+  return { start: addDays(prevStatement(end, day), 1), end };
+}
+
+/** The first `dueDay` after the statement date, or null when no due day is set. */
 export function dueAfter(stmt, dueDay) {
+  if (!dueDay) return null;
   const { y, m } = parse(stmt);
   const same = onDay(y, m, dueDay);
   return same > stmt ? same : onDay(y, m + 1, dueDay);
 }
 
-/* ── The bill ──────────────────────────────────────────────────────────────── */
-
-/** The smallest payment that keeps the card in good standing. */
+/** The smallest payment that keeps the card in good standing, or null if no rule is set. */
 export function minimumDue(billed, card) {
+  if (card.minPct === null || card.minPct === undefined) return null;
   if (billed <= NEAR_ZERO) return 0;
-  return r2(Math.min(billed, Math.max(card.minFloor, (billed * card.minPct) / 100)));
+  return r2(Math.min(billed, Math.max(MIN_FLOOR, (billed * card.minPct) / 100)));
 }
 
 /*
- * Everything the bank would print for one card, as of `today`.
+ * Renewal is metadata and a reminder, nothing more. It never resets a
+ * statement, the outstanding or the history. An annual renewal rolls forward
+ * every year; an expiry date, once passed, marks the card inactive — its
+ * statements and entries all stay.
+ */
+export function renewalState(renewal, today) {
+  if (!renewal) return null;
+  const [y, m] = renewal.month.split('-').map(Number);
+  const [ty, tm] = today.split('-').map(Number);
+  if (renewal.kind === 'expiry') {
+    const last = key(y, m - 1, lastDay(y, m - 1));
+    return { ...renewal, next: renewal.month, expired: today > last, daysLeft: daysBetween(today, last) };
+  }
+  /* Annual: the renewal month entered, or — once that has gone by — the next
+     time the same month comes round, this month included. */
+  const current = `${ty}-${String(tm).padStart(2, '0')}`;
+  const year = renewal.month >= current ? y : tm <= m ? ty : ty + 1;
+  const next = `${year}-${String(m).padStart(2, '0')}`;
+  return { ...renewal, next, expired: false, daysLeft: daysBetween(today, `${next}-01`) };
+}
+
+/*
+ * Everything about one card, as of `today`.
  *
- * `rows` are every entry that touched the card (kind, amount, date, method,
- * to_method), oldest first; `opening` is what the wallet held before any of
- * them — negative when you started out already owing on it.
+ * `rows` are every ledger entry that touched the card, oldest first; `opening`
+ * is the wallet's opening balance — negative by what was already outstanding
+ * when the card was added, and zero for a new card.
  */
 export function cardReport(name, card, rows, opening, today, { history = 6 } = {}) {
-  // What each entry did to the card: a swipe takes it down, a payment brings it back.
-  const moves = rows.map((t) => ({ date: String(t.date).slice(0, 10), effect: effectOn(t, name) }))
-    .filter((x) => Math.abs(x.effect) > NEAR_ZERO);
+  const moves = rows.map((t) => cardMove(t, name)).filter((x) => x && Math.abs(x.effect) > NEAR_ZERO);
 
   const balanceAt = (k) => moves.reduce((n, x) => (x.date <= k ? n + x.effect : n), opening);
-  const creditsIn = (from, to) => moves.reduce((n, x) => (x.date > from && x.date <= to && x.effect > 0 ? n + x.effect : n), 0);
-  const chargesIn = (from, to) => moves.reduce((n, x) => (x.date > from && x.date <= to && x.effect < 0 ? n - x.effect : n), 0);
+  // Payments and refunds applied after a statement, up to a day: what went towards that bill.
+  const creditsIn = (after, upTo) => moves.reduce((n, x) => (x.date > after && x.date <= upTo && x.effect > 0 ? n + x.effect : n), 0);
 
   const balance = moves.reduce((n, x) => n + x.effect, opening);
-  const owed = r2(Math.max(0, -balance));
+  const outstanding = r2(Math.max(0, -balance));
+  const inCredit = r2(Math.max(0, balance));
   const available = card.limit > 0 ? r2(card.limit + balance) : null;
 
-  const stmt = lastStatement(today, card.statementDay);
-  const next = nextStatement(stmt, card.statementDay);
+  const stmt = lastStatement(today, card.statementDay);     // the last statement made up
+  const closes = nextStatement(stmt, card.statementDay);    // the one the current cycle closes on
 
-  /* One statement: what was billed, what was the minimum, and what has been
-     paid towards it since. Payments count from the day after the statement,
-     which is how a bank applies them. */
+  /* One closed statement: what it billed, and what has been paid towards it
+     since — counted from the day after it was made up, the way a bank applies
+     payments. Without a due day, "paid in time" means before the next one. */
   const bill = (s) => {
+    const next = nextStatement(s, card.statementDay);
     const billed = r2(Math.max(0, -balanceAt(s)));
     const due = dueAfter(s, card.dueDay);
-    const min = minimumDue(billed, card);
+    const deadline = due || next;
+    const minDue = minimumDue(billed, card);
     const paid = r2(creditsIn(s, today));
-    const paidByDue = r2(creditsIn(s, due < today ? due : today));
-    const before = prevStatement(s, card.statementDay);
+    const cycle = { start: addDays(prevStatement(s, card.statementDay), 1), end: s };
     return {
-      date: s, cycleStart: addDays(before, 1), dueDate: due, billed, minDue: min,
-      spent: r2(chargesIn(before, s)),
-      paid, paidByDue,
+      date: s, cycleStart: cycle.start, dueDate: due, billed, minDue,
+      spent: activity(moves, cycle.start, cycle.end).spent,
+      paid, paidInTime: r2(creditsIn(s, deadline < today ? deadline : today)),
       remaining: r2(Math.max(0, billed - paid)),
-      remainingMin: r2(Math.max(0, min - paid)),
+      remainingMin: minDue === null ? null : r2(Math.max(0, minDue - paid)),
+      deadline,
     };
   };
 
-  const current = bill(stmt);
-  const daysLeft = daysBetween(today, current.dueDate);
+  const last = bill(stmt);
+  const daysLeft = last.dueDate ? daysBetween(today, last.dueDate) : null;
 
-  /* Where this bill stands. The order matters: nothing billed beats everything,
-     then paid in full, then what the calendar says about the rest. */
+  /* Where the last statement stands. Nothing billed beats everything, then
+     paid in full; without a due date the bill is simply open until paid. */
   let status;
-  if (current.billed <= NEAR_ZERO) status = 'clear';
-  else if (current.remaining <= NEAR_ZERO) status = 'paid';
-  else if (daysLeft >= 0) status = current.remainingMin <= NEAR_ZERO ? 'min_paid' : 'due';
-  else status = current.paidByDue + NEAR_ZERO >= current.minDue ? 'carried' : 'overdue';
+  if (last.billed <= NEAR_ZERO) status = 'clear';
+  else if (last.remaining <= NEAR_ZERO) status = 'paid';
+  else if (daysLeft === null) status = 'open';
+  else if (daysLeft >= 0) status = last.remainingMin !== null && last.remainingMin <= NEAR_ZERO ? 'min_paid' : 'due';
+  else status = last.minDue !== null && last.paidInTime + NEAR_ZERO >= last.minDue ? 'carried' : 'overdue';
 
-  // Interest runs on what is left unpaid once the due date has gone by.
-  const monthlyRate = card.apr / 1200;
-  const interestIfCarried = r2(current.remaining * monthlyRate);
-
-  /* A purchase today lands on the next statement and is due on that statement's
-     due date: that gap is the interest-free period it gets. Bought the day
-     after a statement, it gets the longest one. */
-  const nextDue = dueAfter(next, card.dueDay);
-  const bestDay = addDays(stmt, 1) > today ? addDays(stmt, 1) : addDays(next, 1);
+  const cycle = {
+    start: addDays(stmt, 1),
+    end: closes,
+    ...activity(moves, addDays(stmt, 1), closes),
+    daysToClose: daysBetween(today, closes),
+    dueDate: dueAfter(closes, card.dueDay),
+  };
 
   /* Earlier statements, newest first, only as far back as the card has been
      used here. A statement from before the first entry knows nothing but the
@@ -190,32 +275,35 @@ export function cardReport(name, card, rows, opening, today, { history = 6 } = {
   for (let s = prevStatement(stmt, card.statementDay); past.length < history && s >= firstUse; s = prevStatement(s, card.statementDay)) {
     const b = bill(s);
     if (b.billed <= NEAR_ZERO && b.spent <= NEAR_ZERO) continue;
-    const settled = b.paidByDue + NEAR_ZERO >= b.billed ? 'paid'
-      : b.paidByDue + NEAR_ZERO >= b.minDue ? 'min_paid' : 'missed';
-    past.push({ ...b, status: b.billed <= NEAR_ZERO ? 'clear' : settled });
+    let st = 'clear';
+    if (b.billed > NEAR_ZERO) {
+      st = b.paidInTime + NEAR_ZERO >= b.billed ? 'paid'
+        : b.minDue !== null && b.paidInTime + NEAR_ZERO >= b.minDue ? 'min_paid'
+        : b.paidInTime > NEAR_ZERO ? 'part_paid' : 'unpaid';
+    }
+    past.push({ ...b, status: st });
   }
+
+  // A purchase today is due on the due date of the cycle it lands in.
+  const bestDay = addDays(closes, 1);
+  const renewal = renewalState(card.renewal, today);
 
   return {
     name,
     ...card,
-    balance: r2(balance),
-    owed,
-    credit: r2(Math.max(0, balance)),         // overpaid: the bank owes you
+    renewal,
+    expired: !!renewal?.expired,
+    outstanding,
+    inCredit,
     available,
-    utilization: card.limit > 0 ? owed / card.limit : null,
-    statement: { ...current, status, daysLeft },
-    cycle: {
-      start: addDays(stmt, 1),
-      end: next,
-      unbilled: r2(chargesIn(stmt, today)),
-      credits: r2(creditsIn(stmt, today)),
-      daysToStatement: daysBetween(today, next),
-    },
-    nextDue,
-    freeDays: daysBetween(today, nextDue),
+    utilization: card.limit > 0 ? outstanding / card.limit : null,
+    cycle,
+    statement: { ...last, status, daysLeft },
+    allTime: activity(moves),
+    freeDays: cycle.dueDate ? daysBetween(today, cycle.dueDate) : null,
     bestDay,
-    maxFreeDays: daysBetween(bestDay, dueAfter(nextStatement(addDays(bestDay, -1), card.statementDay), card.dueDay)),
-    interestIfCarried,
+    maxFreeDays: card.dueDay ? daysBetween(bestDay, dueAfter(nextStatement(closes, card.statementDay), card.dueDay)) : null,
+    interestIfCarried: card.apr ? r2(last.remaining * (card.apr / 1200)) : null,
     history: past,
   };
 }

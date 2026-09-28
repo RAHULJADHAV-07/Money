@@ -5,12 +5,13 @@ import { useApi, useStore } from '../lib/store.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { money, dayLabel } from '../lib/format.js';
 import { KINDS } from '../lib/kinds.js';
-import { CARD_DEFAULTS, ordinal } from '../lib/credit.js';
+import { ordinal, renewalLine, isCard } from '../lib/credit.js';
 import {
   IconDownload, IconLogout, IconClose, IconPlus,
   IconWallet, IconTag, IconTarget, IconUser, IconInfo, IconSavings, IconChevronRight,
-  IconSpark,
+  IconSpark, IconCard,
 } from '../components/Icons.jsx';
+import CardSetupSheet from '../components/CardSetupSheet.jsx';
 import SignInMethods from '../components/SignInMethods.jsx';
 import RoutineSheet from '../components/RoutineSheet.jsx';
 import ExportSheet from '../components/ExportSheet.jsx';
@@ -35,93 +36,17 @@ function whenLabel(r) {
 }
 
 // Everything the settings form owns, in one place, so "has this changed?" is a
-// single comparison rather than a field-by-field one.
-//
-// A card's opening balance is stored the way the ledger needs it -- negative,
-// by what was owed -- but typed the way anyone thinks of it: "I owed 12,000".
-// So the draft carries it as `owedAtStart` on the card, and `toSave` turns it
-// back into a negative opening balance on the way out.
-const draftOf = (s) => {
-  const cards = s.creditCards || {};
-  return {
-    currency: s.currency,
-    openingBalance: s.openingBalance,
-    openingBalances: Object.fromEntries(
-      Object.entries(s.openingBalances || {}).filter(([m]) => !cards[m])
-    ),
-    categories: [...s.categories],
-    sources: [...s.sources],
-    methods: [...s.methods],
-    creditCards: Object.fromEntries(Object.entries(cards).map(([m, c]) => {
-      const opening = Number(s.openingBalances?.[m]) || 0;
-      return [m, { ...c, owedAtStart: opening < 0 ? String(-opening) : '' }];
-    })),
-  };
-};
-
-function toSave(draft) {
-  const openingBalances = { ...draft.openingBalances };
-  const creditCards = {};
-  for (const [m, c] of Object.entries(draft.creditCards)) {
-    if (!draft.methods.includes(m)) continue;
-    const { owedAtStart, ...terms } = c;
-    creditCards[m] = terms;
-    openingBalances[m] = -(Number(owedAtStart) || 0);
-  }
-  return { ...draft, openingBalances, creditCards };
-}
-
-/* The terms a credit card runs on — the same four numbers printed at the top
-   of every statement. Each one says what it is for in the words of the bill,
-   because "statement day" means nothing until you know it is when the bill is
-   made up. */
-function CardTerms({ name, card, currency, onChange }) {
-  const set = (k) => (e) => onChange({ ...card, [k]: e.target.value });
-  const days = Array.from({ length: 31 }, (_, i) => i + 1);
-  return (
-    <div className="cc-terms">
-      <NumberRow label="Credit limit" currency={currency} value={card.limit} onChange={(v) => onChange({ ...card, limit: v })} />
-      <NumberRow label="Owed when you started" currency={currency} value={card.owedAtStart}
-                 onChange={(v) => onChange({ ...card, owedAtStart: v })} />
-      <div className="row-2 cc-days">
-        <div className="field">
-          <label className="field-label" htmlFor={`sd-${name}`}>Statement day</label>
-          <select id={`sd-${name}`} className="input" value={card.statementDay} onChange={set('statementDay')}>
-            {days.map((d) => <option key={d} value={d}>{ordinal(d)} of the month</option>)}
-          </select>
-        </div>
-        <div className="field">
-          <label className="field-label" htmlFor={`dd-${name}`}>Payment due</label>
-          <select id={`dd-${name}`} className="input" value={card.dueDay} onChange={set('dueDay')}>
-            {days.map((d) => <option key={d} value={d}>{ordinal(d)} of the month</option>)}
-          </select>
-        </div>
-      </div>
-      <div className="row-2 cc-days">
-        <div className="field">
-          <label className="field-label" htmlFor={`apr-${name}`}>Interest a year</label>
-          <div className="suffix-field">
-            <input id={`apr-${name}`} className="input" type="number" inputMode="decimal" value={card.apr} onChange={set('apr')} />
-            <span>%</span>
-          </div>
-        </div>
-        <div className="field">
-          <label className="field-label" htmlFor={`min-${name}`}>Minimum due</label>
-          <div className="suffix-field">
-            <input id={`min-${name}`} className="input" type="number" inputMode="decimal" value={card.minPct} onChange={set('minPct')} />
-            <span>% of bill</span>
-          </div>
-        </div>
-      </div>
-      <p className="hint">
-        Spending from the {ordinal(Number(card.statementDay) === 31 ? 1 : Number(card.statementDay) + 1)} to
-        the {ordinal(card.statementDay)} is billed on the {ordinal(card.statementDay)}, and that bill is due
-        on the {ordinal(card.dueDay)}. Pay the whole bill by then and you pay no interest. Most cards in
-        India charge 36–45% a year on whatever is left.
-      </p>
-    </div>
-  );
-}
+// single comparison rather than a field-by-field one. Credit cards are not in
+// it: a card's terms and its opening outstanding save together from the card's
+// own sheet, so nothing here can turn a limit into an opening balance.
+const draftOf = (s) => ({
+  currency: s.currency,
+  openingBalance: s.openingBalance,
+  openingBalances: Object.fromEntries(Object.entries(s.openingBalances || {}).filter(([m]) => !s.creditCards?.[m])),
+  categories: [...s.categories],
+  sources: [...s.sources],
+  methods: [...s.methods],
+});
 
 function ListEditor({ label, hint, placeholder, items, onChange }) {
   const [text, setText] = useState('');
@@ -183,6 +108,7 @@ export default function Settings() {
   const [editing, setEditing] = useState(null);   // {} for a new routine, the routine for an edit
   const [reload, setReload] = useState(0);
   const [exporting, setExporting] = useState(false);
+  const [cardSheet, setCardSheet] = useState(null);   // { name } to edit, {} to add
 
   const routines = useApi(() => api.routines(), [reload]).data?.items || [];
   const goals = useApi(() => api.goals(), []).data?.items || [];
@@ -207,19 +133,15 @@ export default function Settings() {
   }
 
   const set = (patch) => setDraft({ ...draft, ...patch });
-  const openingTotal = Object.entries(draft.openingBalances || {})
-    .filter(([m]) => !draft.creditCards[m])
-    .reduce((n, [, v]) => n + (Number(v) || 0), 0);
-  const setCard = (m, card) => {
-    const creditCards = { ...draft.creditCards };
-    if (card) creditCards[m] = card; else delete creditCards[m];
-    set({ creditCards });
-  };
+  // Money wallets only: a card is not money, and has its own panel below.
+  const realWallets = draft.methods.filter((m) => !isCard(settings, m));
+  const cards = draft.methods.filter((m) => isCard(settings, m));
+  const openingTotal = realWallets.reduce((n, m) => n + (Number(draft.openingBalances[m]) || 0), 0);
 
   async function save() {
     setSaving(true);
     try {
-      await api.saveSettings(toSave(draft));
+      await api.saveSettings(draft);
       notify('Settings saved');
       refresh();
     } catch (err) {
@@ -235,49 +157,56 @@ export default function Settings() {
           <span className="card-sub num">{money(openingTotal, draft.currency)} opening</span>
         </div>
         <p className="hint hint--lead">
-          What each wallet held before you started logging here. Everything you add moves up or down from these.
-          Tick <b>credit card</b> on any wallet that is one, and it gets a bill, a due date and a limit of its own.
+          What each wallet held before you started logging here — real money only. Everything you add moves up or
+          down from these, and together they are your balance in hand.
         </p>
-        {draft.methods.map((m) => {
-          const card = draft.creditCards[m];
-          return (
-            <div key={m} className={`wallet-set${card ? ' is-card' : ''}`}>
-              {card ? (
-                <div className="num-row"><span className="num-row-k">{m}</span></div>
-              ) : (
-                <NumberRow
-                  label={m} currency={draft.currency}
-                  value={draft.openingBalances[m]}
-                  onChange={(v) => set({ openingBalances: { ...draft.openingBalances, [m]: v } })}
-                />
-              )}
-              <label className="check cc-check">
-                <input
-                  type="checkbox" checked={!!card}
-                  onChange={(e) => setCard(m, e.target.checked
-                    ? { ...CARD_DEFAULTS, ...(settings.creditCards?.[m] || {}), owedAtStart: '' }
-                    : null)}
-                />
-                <span className="check-body">
-                  <b>{m} is a credit card</b>
-                </span>
-              </label>
-              {card && (
-                <CardTerms name={m} card={card} currency={draft.currency} onChange={(c) => setCard(m, c)} />
-              )}
-            </div>
-          );
-        })}
+        {realWallets.map((m) => (
+          <NumberRow
+            key={m} label={m} currency={draft.currency}
+            value={draft.openingBalances[m]}
+            onChange={(v) => set({ openingBalances: { ...draft.openingBalances, [m]: v } })}
+          />
+        ))}
         <div className="divider" />
         <ListEditor
           label="Payment methods" placeholder="Cash, UPI, Bank…"
-          items={draft.methods} onChange={(methods) => set({ methods })}
+          items={realWallets} onChange={(list) => set({ methods: [...list, ...cards] })}
+          hint="Credit cards are added in their own panel below, so a limit can never be mistaken for money."
         />
         <div className="field">
           <label className="field-label" htmlFor="cur">Currency symbol</label>
           <input id="cur" className="input input--short" value={draft.currency}
                  onChange={(e) => set({ currency: e.target.value })} />
         </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head">
+          <h2 className="card-title"><span className="card-ico"><IconCard /></span>Credit cards</h2>
+          <button className="card-action" onClick={() => setCardSheet({})}>Add card<IconPlus /></button>
+        </div>
+        <p className="hint hint--lead">
+          A card's limit is what you may spend, not money you have — it is never added to your balance. Purchases
+          raise what you owe; paying the card from Bank lowers it.
+        </p>
+        {!cards.length && <div className="tags-empty">No credit cards yet</div>}
+        {cards.map((m) => {
+          const c = settings.creditCards[m];
+          return (
+            <button key={m} className="rt-row" onClick={() => setCardSheet({ name: m })}>
+              <span className="rt-body">
+                <span className="rt-name">{m}</span>
+                <span className="rt-meta">
+                  {`Statement ${ordinal(c.statementDay)}`}
+                  {c.dueDay ? ` · due ${ordinal(c.dueDay)}` : ' · due date not set'}
+                  {` · ${c.renewal ? renewalLine({ ...c.renewal, next: c.renewal.month }).replace(/ · next.*/, '') : 'renewal not set'}`}
+                </span>
+              </span>
+              <span className="rt-amt num">{c.limit > 0 ? `${money(c.limit, draft.currency)} limit` : 'No limit'}</span>
+              <IconChevronRight />
+            </button>
+          );
+        })}
       </div>
 
       <div className="card">
@@ -384,6 +313,7 @@ export default function Settings() {
       </div>
 
       {exporting && <ExportSheet onClose={() => setExporting(false)} />}
+      {cardSheet && <CardSetupSheet key={cardSheet.name || 'new-card'} name={cardSheet.name || null} onClose={() => setCardSheet(null)} />}
 
       {editing && (
         <RoutineSheet

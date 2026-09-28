@@ -9,6 +9,7 @@ export function txTitle(t) {
   if (t.note) return t.note;
   if (t.kind === 'expense') return t.category || 'Expense';
   if (t.kind === 'income') return t.source || 'Income';
+  if (t.kind === 'refund') return `Refund · ${t.category || 'purchase'}`;
   if (t.person) return t.person;
   return t.goal?.name || 'Savings';
 }
